@@ -1,0 +1,38 @@
+name: sijawara
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  intl: ^0.20.2
+  permission_handler: ^11.3.1
+  geolocator: ^13.0.2
+  shared_preferences: ^2.3.4
+  http: ^1.2.2
+  url_launcher: ^6.3.1
+  audioplayers: ^6.5.1
+  google_fonts: ^8.0.2
+  scrollable_positioned_list: ^0.3.8
+  flutter_markdown: ^0.7.7+1
+  crypto: ^3.0.7
+  image_picker: ^1.1.2
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  image_cropper: ^11.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - lib/assets/
+    - lib/assets/sounds/
