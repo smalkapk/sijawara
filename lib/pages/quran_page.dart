@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../widgets/bottom_menu.dart';
 import '../services/quran_reading_service.dart';
+import '../services/tahfidz_service.dart';
 import 'surah_detail_page.dart';
 
 // ── Data Model ──
@@ -20,31 +21,6 @@ class Surah {
     required this.arabicName,
     required this.ayatCount,
     required this.type,
-  });
-}
-
-// ── Data Model: Setoran ──
-class SetoranLog {
-  final int no;
-  final DateTime tanggal;
-  final String surahDari;
-  final int ayatDari;
-  final String surahSampai;
-  final int ayatSampai;
-  final String nilai; // A, B, C, D
-  final bool sudahParaf; // paraf guru
-  final String? namaGuru;
-
-  const SetoranLog({
-    required this.no,
-    required this.tanggal,
-    required this.surahDari,
-    required this.ayatDari,
-    required this.surahSampai,
-    required this.ayatSampai,
-    required this.nilai,
-    this.sudahParaf = false,
-    this.namaGuru,
   });
 }
 
@@ -186,69 +162,16 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
   // Bookmarks (tandai) from persistent storage
   List<BookmarkEntry> _bookmarks = [];
 
-  // ── Dummy Setoran Data ──
-  final List<SetoranLog> _setoranList = [
-    SetoranLog(
-      no: 1,
-      tanggal: DateTime(2026, 2, 10),
-      surahDari: 'Al-Fatihah',
-      ayatDari: 1,
-      surahSampai: 'Al-Fatihah',
-      ayatSampai: 7,
-      nilai: 'A',
-      sudahParaf: true,
-      namaGuru: 'Ust. Ahmad',
-    ),
-    SetoranLog(
-      no: 2,
-      tanggal: DateTime(2026, 2, 11),
-      surahDari: 'Al-Baqarah',
-      ayatDari: 1,
-      surahSampai: 'Al-Baqarah',
-      ayatSampai: 25,
-      nilai: 'B',
-      sudahParaf: true,
-      namaGuru: 'Ust. Ahmad',
-    ),
-    SetoranLog(
-      no: 3,
-      tanggal: DateTime(2026, 2, 12),
-      surahDari: 'Al-Baqarah',
-      ayatDari: 26,
-      surahSampai: 'Al-Baqarah',
-      ayatSampai: 50,
-      nilai: 'A',
-      sudahParaf: true,
-      namaGuru: 'Ust. Mahmud',
-    ),
-    SetoranLog(
-      no: 4,
-      tanggal: DateTime(2026, 2, 14),
-      surahDari: 'Al-Baqarah',
-      ayatDari: 51,
-      surahSampai: 'Al-Baqarah',
-      ayatSampai: 75,
-      nilai: 'C',
-      sudahParaf: true,
-      namaGuru: 'Ust. Ahmad',
-    ),
-    SetoranLog(
-      no: 5,
-      tanggal: DateTime(2026, 2, 17),
-      surahDari: 'Al-Baqarah',
-      ayatDari: 76,
-      surahSampai: 'Al-Baqarah',
-      ayatSampai: 100,
-      nilai: 'B',
-      sudahParaf: false,
-    ),
-  ];
+  // ── Setoran (loaded from API) ──
+  List<TahfidzSetoran> _setoranList = [];
+  bool _isLoadingSetoran = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadReadingHistory();
+    _loadSetoran();
   }
 
   void _loadReadingHistory() async {
@@ -259,6 +182,23 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
         _readingHistory = history;
         _bookmarks = bookmarks;
       });
+    }
+  }
+
+  Future<void> _loadSetoran() async {
+    try {
+      final data = await TahfidzService.getMySetoran();
+      if (mounted) {
+        setState(() {
+          // API returns DESC, reverse to ASC for display logic
+          _setoranList = data.reversed.toList();
+          _isLoadingSetoran = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSetoran = false);
+      }
     }
   }
 
@@ -991,9 +931,22 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
   // ── TAB: PROGRESS (Setoran Al-Qur'an) ──
   // ══════════════════════════════════════════
   Widget _buildProgressTab() {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
+    if (_isLoadingSetoran) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 80),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadSetoran,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        slivers: [
         // ── Summary Card ──
         SliverToBoxAdapter(
           child: Padding(
@@ -1054,28 +1007,30 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final setoran = _setoranList[_setoranList.length - 1 - index];
-                      return _buildSetoranCard(setoran, index);
+                      final setoranNo = _setoranList.length - index;
+                      return _buildSetoranCard(setoran, index, setoranNo);
                     },
                     childCount: _setoranList.length,
                   ),
                 ),
               ),
       ],
+      ),
     );
   }
 
   // ── Setoran Summary Card ──
   Widget _buildSetoranSummary() {
     final totalSetoran = _setoranList.length;
-    final sudahParaf = _setoranList.where((s) => s.sudahParaf).length;
+    final sudahParaf = _setoranList.where((s) => s.guruName.isNotEmpty).length;
     final lastSetoran = _setoranList.isNotEmpty ? _setoranList.last : null;
 
     // Hitung nilai rata-rata
     String rataRata = '-';
     if (_setoranList.isNotEmpty) {
-      final nilaiMap = {'A': 4, 'B': 3, 'C': 2, 'D': 1};
-      final total = _setoranList.fold<int>(
-          0, (sum, s) => sum + (nilaiMap[s.nilai] ?? 0));
+      final nilaiMap = {'A': 4.0, 'B+': 3.5, 'B': 3.0, 'C': 2.0, 'D': 1.0};
+      final total = _setoranList.fold<double>(
+          0, (sum, s) => sum + (nilaiMap[s.grade] ?? 0));
       final avg = total / _setoranList.length;
       if (avg >= 3.5) {
         rataRata = 'A';
@@ -1183,7 +1138,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                   children: [
                     Text(
                       lastSetoran != null
-                          ? 'Terakhir: ${lastSetoran.surahDari}'
+                          ? 'Terakhir: ${lastSetoran.surahName}'
                           : 'Belum ada setoran',
                       style: const TextStyle(
                         fontSize: 15,
@@ -1194,7 +1149,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                     const SizedBox(height: 4),
                     Text(
                       lastSetoran != null
-                          ? 'Ayat ${lastSetoran.ayatDari} - ${lastSetoran.ayatSampai}'
+                          ? 'Ayat ${lastSetoran.ayatFrom} - ${lastSetoran.ayatTo}'
                           : 'Mulai setoran pertamamu',
                       style: TextStyle(
                         fontSize: 12,
@@ -1224,11 +1179,11 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
 
   // ── Stats Row (mini) ──
   Widget _buildSetoranStatsRow() {
-    // Count values per grade
-    final countA = _setoranList.where((s) => s.nilai == 'A').length;
-    final countB = _setoranList.where((s) => s.nilai == 'B').length;
-    final countC = _setoranList.where((s) => s.nilai == 'C').length;
-    final countD = _setoranList.where((s) => s.nilai == 'D').length;
+    // Count values per grade (B+ grouped with B)
+    final countA = _setoranList.where((s) => s.grade == 'A').length;
+    final countB = _setoranList.where((s) => s.grade == 'B' || s.grade == 'B+').length;
+    final countC = _setoranList.where((s) => s.grade == 'C').length;
+    final countD = _setoranList.where((s) => s.grade == 'D').length;
 
     return Row(
       children: [
@@ -1348,16 +1303,17 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
   }
 
   // ── Setoran Card ──
-  Widget _buildSetoranCard(SetoranLog setoran, int animIndex) {
+  Widget _buildSetoranCard(TahfidzSetoran setoran, int animIndex, int setoranNo) {
     final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
-    final formattedDate = dateFormat.format(setoran.tanggal);
+    final formattedDate = dateFormat.format(setoran.setoranAt);
 
     // Nilai badge color
     Color nilaiColor;
-    switch (setoran.nilai) {
+    switch (setoran.grade) {
       case 'A':
         nilaiColor = const Color(0xFF059669);
         break;
+      case 'B+':
       case 'B':
         nilaiColor = AppTheme.softBlue;
         break;
@@ -1372,14 +1328,10 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
     }
 
     // Setoran range text
-    String setoranRange;
-    if (setoran.surahDari == setoran.surahSampai) {
-      setoranRange =
-          'QS. ${setoran.surahDari}: ${setoran.ayatDari} — ${setoran.ayatSampai}';
-    } else {
-      setoranRange =
-          'QS. ${setoran.surahDari}: ${setoran.ayatDari} — QS. ${setoran.surahSampai}: ${setoran.ayatSampai}';
-    }
+    final setoranRange =
+        'QS. ${setoran.surahName}: ${setoran.ayatFrom} — ${setoran.ayatTo}';
+
+    final sudahParaf = setoran.guruName.isNotEmpty;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -1427,7 +1379,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(7),
                     ),
                     child: Text(
-                      '${setoran.no}',
+                      '$setoranNo',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
@@ -1462,7 +1414,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      setoran.nilai,
+                      setoran.grade,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -1487,7 +1439,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withOpacity(0.08),
+                          color: AppTheme.primaryGreen.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -1537,7 +1489,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: nilaiColor.withOpacity(0.08),
+                          color: nilaiColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -1560,7 +1512,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                             ),
                           ),
                           Text(
-                            _nilaiLabel(setoran.nilai),
+                            _nilaiLabel(setoran.grade),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -1574,17 +1526,17 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: setoran.sudahParaf
-                              ? AppTheme.primaryGreen.withOpacity(0.08)
-                              : AppTheme.gold.withOpacity(0.08),
+                          color: sudahParaf
+                              ? AppTheme.primaryGreen.withValues(alpha: 0.08)
+                              : AppTheme.gold.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
-                          setoran.sudahParaf
+                          sudahParaf
                               ? Icons.verified_rounded
                               : Icons.pending_rounded,
                           size: 16,
-                          color: setoran.sudahParaf
+                          color: sudahParaf
                               ? AppTheme.primaryGreen
                               : AppTheme.gold,
                         ),
@@ -1603,13 +1555,13 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                             ),
                           ),
                           Text(
-                            setoran.sudahParaf
-                                ? (setoran.namaGuru ?? 'Sudah')
+                            sudahParaf
+                                ? (setoran.guruName.isNotEmpty ? setoran.guruName : 'Sudah')
                                 : 'Menunggu',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: setoran.sudahParaf
+                              color: sudahParaf
                                   ? AppTheme.primaryGreen
                                   : AppTheme.gold,
                             ),
@@ -1630,13 +1582,15 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
   String _nilaiLabel(String nilai) {
     switch (nilai) {
       case 'A':
-        return 'Sangat Baik';
+        return 'Mumtaz';
+      case 'B+':
+        return 'Jayyid Jiddan';
       case 'B':
-        return 'Baik';
+        return 'Jayyid';
       case 'C':
-        return 'Cukup';
+        return 'Maqbul';
       case 'D':
-        return 'Perlu Perbaikan';
+        return 'Rasib';
       default:
         return nilai;
     }

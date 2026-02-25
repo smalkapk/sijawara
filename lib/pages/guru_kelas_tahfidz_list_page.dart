@@ -1,35 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/tahfidz_service.dart';
 import 'guru_kelas_tahfidz_report_page.dart';
 
 class GuruKelasTahfidzListPage extends StatefulWidget {
   const GuruKelasTahfidzListPage({super.key});
 
   @override
-  State<GuruKelasTahfidzListPage> createState() => _GuruKelasTahfidzListPageState();
+  State<GuruKelasTahfidzListPage> createState() =>
+      _GuruKelasTahfidzListPageState();
 }
 
 class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
-  // Dummy student data
-  final List<Map<String, dynamic>> _students = [
-    {
-      'name': 'Ahmad Fauzi',
-      'nis': '10101',
-    },
-    {
-      'name': 'Siti Aisyah',
-      'nis': '10102',
-    },
-    {
-      'name': 'Budi Santoso',
-      'nis': '10103',
-    },
-    {
-      'name': 'Farah Nisa',
-      'nis': '10104',
-    },
-  ];
+  List<TahfidzStudent> _allStudents = [];
+  List<TahfidzStudent> _filteredStudents = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() => _isLoading = true);
+    try {
+      final students = await TahfidzService.getStudents();
+      if (mounted) {
+        setState(() {
+          _allStudents = students;
+          _filteredStudents = students;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memuat daftar siswa: $e'),
+            backgroundColor: Colors.red.shade400,
+          ),
+        );
+      }
+    }
+  }
+
+  void _filterStudents(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+      if (_searchQuery.isEmpty) {
+        _filteredStudents = _allStudents;
+      } else {
+        _filteredStudents = _allStudents.where((s) {
+          return s.name.toLowerCase().contains(_searchQuery) ||
+              s.nis.toLowerCase().contains(_searchQuery);
+        }).toList();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,14 +79,48 @@ class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
             _buildHeader(),
             _buildSearchFilter(),
             Expanded(
-              child: ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                itemCount: _students.length,
-                itemBuilder: (context, index) {
-                  return _buildStudentCard(_students[index]);
-                },
-              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppTheme.primaryGreen),
+                    )
+                  : _filteredStudents.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.people_outline_rounded,
+                                  size: 64, color: AppTheme.grey400),
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'Siswa tidak ditemukan'
+                                    : 'Belum ada siswa',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.grey400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          color: AppTheme.primaryGreen,
+                          onRefresh: _loadStudents,
+                          child: ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 8),
+                            itemCount: _filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              return _buildStudentCard(
+                                  _filteredStudents[index]);
+                            },
+                          ),
+                        ),
             ),
           ],
         ),
@@ -135,7 +207,7 @@ class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
+                    color: Colors.black.withValues(alpha: 0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -149,6 +221,8 @@ class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
+                      controller: _searchController,
+                      onChanged: _filterStudents,
                       decoration: InputDecoration(
                         hintText: 'Cari nama/NIS siswa...',
                         hintStyle: TextStyle(
@@ -181,14 +255,22 @@ class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
     );
   }
 
-  Widget _buildStudentCard(Map<String, dynamic> student) {
+  Widget _buildStudentCard(TahfidzStudent student) {
+    final studentMap = {
+      'student_id': student.studentId,
+      'name': student.name,
+      'nis': student.nis,
+      'class_name': student.className,
+    };
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => GuruKelasTahfidzReportPage(studentData: student),
+            builder: (_) =>
+                GuruKelasTahfidzReportPage(studentData: studentMap),
           ),
         );
       },
@@ -207,12 +289,12 @@ class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withOpacity(0.1),
+                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: Text(
-                  student['name'][0],
+                  student.name.isNotEmpty ? student.name[0] : '?',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -227,7 +309,7 @@ class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    student['name'],
+                    student.name,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -236,13 +318,25 @@ class _GuruKelasTahfidzListPageState extends State<GuruKelasTahfidzListPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'NIS: ${student['nis']}',
+                    'NIS: ${student.nis}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textSecondary,
                     ),
                   ),
+                  if (student.className.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        student.className,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.grey400,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

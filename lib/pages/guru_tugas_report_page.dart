@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/guru_tugas_service.dart';
 
 import 'guru_tugas_form_page.dart';
 
@@ -17,23 +18,45 @@ class GuruTugasReportPage extends StatefulWidget {
 
 class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
   int? _selectedReportIndex;
+  List<GuruTugasReport> _reports = [];
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> dummyReports = const [
-    {
-      'date': '24-02-2026',
-      'judul': 'Pentingnya Akhlak',
-      'materi': 'Membahas tentang akhlak dalam Islam dan implementasinya.',
-      'mentor': 'Ust. Hasan',
-      'note': 'Sangat aktif dalam diskusi, argumen yang disampaikan sangat berdasar.',
-    },
-    {
-      'date': '20-02-2026',
-      'judul': 'Sejarah Kemerdekaan',
-      'materi': 'Sejarah perlawanan pahlawan Islam di Indonesia.',
-      'mentor': 'Ust. Hasan',
-      'note': 'Pemahaman baik, perlu lebih berani mengemukakan pendapat pribadi.',
-    },
-  ];
+  int get _studentId => widget.studentData['student_id'] is int
+      ? widget.studentData['student_id']
+      : int.parse(widget.studentData['student_id'].toString());
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReports();
+  }
+
+  Future<void> _loadReports() async {
+    setState(() => _isLoading = true);
+    try {
+      final reports = await GuruTugasService.getReports(
+        studentId: _studentId,
+        subject: widget.subjectName,
+      );
+      if (mounted) {
+        setState(() {
+          _reports = reports;
+          _isLoading = false;
+          _selectedReportIndex = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memuat laporan: $e'),
+            backgroundColor: Colors.red.shade400,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,24 +67,55 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
           children: [
             _buildHeader(context),
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Column(
-                  children: [
-                    ...dummyReports.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final report = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: _buildReportCard(report, index),
-                      );
-                    }),
-                    const SizedBox(height: 100),
-                  ],
-                ),
-              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppTheme.primaryGreen),
+                    )
+                  : _reports.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.assignment_outlined,
+                                  size: 64, color: AppTheme.grey400),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Belum ada laporan tugas',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.grey400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadReports,
+                          color: AppTheme.primaryGreen,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 16),
+                            child: Column(
+                              children: [
+                                ..._reports.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final report = entry.value;
+                                  return Padding(
+                                    padding:
+                                        const EdgeInsets.only(bottom: 16.0),
+                                    child: _buildReportCard(report, index),
+                                  );
+                                }),
+                                const SizedBox(height: 100),
+                              ],
+                            ),
+                          ),
+                        ),
             ),
           ],
         ),
@@ -138,8 +192,10 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
     );
   }
 
-  Widget _buildReportCard(Map<String, dynamic> report, int index) {
+  Widget _buildReportCard(GuruTugasReport report, int index) {
     final isSelected = _selectedReportIndex == index;
+    final formattedDate =
+        "${report.date.day.toString().padLeft(2, '0')}-${report.date.month.toString().padLeft(2, '0')}-${report.date.year}";
 
     return GestureDetector(
       onTap: () {
@@ -215,7 +271,7 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
-                    report['date'],
+                    formattedDate,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -226,16 +282,13 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
               ],
             ),
             const SizedBox(height: 20),
-            _buildReportItem('Judul', report['judul']),
+            _buildReportItem('Judul', report.judul),
             _buildDivider(),
-            _buildReportItem('Materi', report['materi']),
+            _buildReportItem('Materi', report.materi),
             _buildDivider(),
-            _buildReportItem('Mentor', report['mentor']),
+            _buildReportItem('Mentor', report.mentor),
             _buildDivider(),
-            _buildReportItem(
-              'Catatan Guru',
-              report['note'],
-            ),
+            _buildReportItem('Catatan Guru', report.note),
           ],
         ),
       ),
@@ -304,18 +357,25 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
                 onTap: () {
                   HapticFeedback.lightImpact();
                   if (hasSelection) {
-                    final selectedData = dummyReports[_selectedReportIndex!];
+                    final selectedReport = _reports[_selectedReportIndex!];
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => GuruTugasFormPage(
                           isEditing: true,
-                          initialData: selectedData,
+                          initialData: {
+                            'id': selectedReport.id,
+                            'date': selectedReport.date.toIso8601String().substring(0, 10),
+                            'judul': selectedReport.judul,
+                            'materi': selectedReport.materi,
+                            'mentor': selectedReport.mentor,
+                            'note': selectedReport.note,
+                          },
                           subjectName: widget.subjectName,
                           studentData: widget.studentData,
                         ),
                       ),
-                    );
+                    ).then((_) => _loadReports());
                   } else {
                     Navigator.push(
                       context,
@@ -326,7 +386,7 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
                           studentData: widget.studentData,
                         ),
                       ),
-                    );
+                    ).then((_) => _loadReports());
                   }
                 },
                 child: AnimatedContainer(

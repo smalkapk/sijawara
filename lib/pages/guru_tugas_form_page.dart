@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/guru_tugas_service.dart';
 
 class GuruTugasFormPage extends StatefulWidget {
   final bool isEditing;
@@ -49,10 +50,10 @@ class _GuruTugasFormPageState extends State<GuruTugasFormPage>
     if (widget.isEditing && widget.initialData != null) {
       if (widget.initialData!['date'] != null) {
         try {
-          // Attempt to parse if it's a valid string format "dd MMM yyyy", but since dummy data is arbitrary string,
-          // for robust implementation, fall back to now if parsing fails.
-          // Or just leave it as now for simplicity in mock. We'll simulate it by checking if date is available
-        } catch (_) {}
+          _selectedDate = DateTime.parse(widget.initialData!['date']);
+        } catch (_) {
+          // fallback to now if parsing fails
+        }
       }
       _judulController.text = widget.initialData!['judul'] ?? '';
       _materiController.text = widget.initialData!['materi'] ?? '';
@@ -99,7 +100,7 @@ class _GuruTugasFormPageState extends State<GuruTugasFormPage>
     }
   }
 
-  void _saveForm() {
+  void _saveForm() async {
     HapticFeedback.mediumImpact();
     if (_judulController.text.isEmpty || _materiController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -112,23 +113,44 @@ class _GuruTugasFormPageState extends State<GuruTugasFormPage>
     }
 
     setState(() => _isSaving = true);
-    // Simulate saving delay
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(
-        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-      ),
-    );
 
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      final studentId = widget.studentData['student_id'] is int
+          ? widget.studentData['student_id']
+          : int.parse(widget.studentData['student_id'].toString());
+
+      final report = GuruTugasReport(
+        id: widget.isEditing ? (widget.initialData!['id'] ?? '') : '',
+        date: _selectedDate,
+        judul: _judulController.text,
+        materi: _materiController.text,
+        mentor: _mentorController.text,
+        note: _noteController.text,
+        subject: widget.subjectName,
+      );
+
+      if (widget.isEditing) {
+        await GuruTugasService.updateReport(
+          studentId: studentId,
+          subject: widget.subjectName,
+          report: report,
+        );
+      } else {
+        await GuruTugasService.addReport(
+          studentId: studentId,
+          subject: widget.subjectName,
+          report: report,
+        );
+      }
+
       if (mounted) {
         setState(() => _isSaving = false);
-        Navigator.pop(context); // Close loading
-        Navigator.pop(context); // Go back to report page
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Laporan berhasil disimpan'),
+            content: Text(widget.isEditing
+                ? 'Laporan berhasil diperbarui'
+                : 'Laporan berhasil disimpan'),
             backgroundColor: AppTheme.primaryGreen,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -137,7 +159,21 @@ class _GuruTugasFormPageState extends State<GuruTugasFormPage>
           ),
         );
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menyimpan laporan: $e'),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override

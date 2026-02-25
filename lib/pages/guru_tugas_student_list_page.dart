@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/guru_tugas_service.dart';
 import 'guru_tugas_report_page.dart';
 
 class GuruTugasStudentListPage extends StatefulWidget {
@@ -14,25 +15,61 @@ class GuruTugasStudentListPage extends StatefulWidget {
 }
 
 class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
-  // Dummy student data
-  final List<Map<String, dynamic>> _students = [
-    {
-      'name': 'Ahmad Fauzi',
-      'nis': '10101',
-    },
-    {
-      'name': 'Siti Aisyah',
-      'nis': '10102',
-    },
-    {
-      'name': 'Budi Santoso',
-      'nis': '10103',
-    },
-    {
-      'name': 'Farah Nisa',
-      'nis': '10104',
-    },
-  ];
+  List<GuruTugasStudent> _allStudents = [];
+  List<GuruTugasStudent> _filteredStudents = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() => _isLoading = true);
+    try {
+      final students = await GuruTugasService.getStudents();
+      if (mounted) {
+        setState(() {
+          _allStudents = students;
+          _filteredStudents = students;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memuat daftar siswa: $e'),
+            backgroundColor: Colors.red.shade400,
+          ),
+        );
+      }
+    }
+  }
+
+  void _filterStudents(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+      if (_searchQuery.isEmpty) {
+        _filteredStudents = _allStudents;
+      } else {
+        _filteredStudents = _allStudents.where((s) {
+          return s.name.toLowerCase().contains(_searchQuery) ||
+              s.nis.toLowerCase().contains(_searchQuery);
+        }).toList();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,15 +81,48 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
             _buildHeader(),
             _buildSearchFilter(),
             Expanded(
-              child: ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                itemCount: _students.length,
-                itemBuilder: (context, index) {
-                  return _buildStudentCard(_students[index]);
-                },
-              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppTheme.primaryGreen),
+                    )
+                  : _filteredStudents.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.people_outline_rounded,
+                                  size: 64, color: AppTheme.grey400),
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchQuery.isNotEmpty
+                                    ? 'Siswa tidak ditemukan'
+                                    : 'Belum ada siswa',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.grey400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadStudents,
+                          color: AppTheme.primaryGreen,
+                          child: ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 8),
+                            itemCount: _filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              return _buildStudentCard(
+                                  _filteredStudents[index]);
+                            },
+                          ),
+                        ),
             ),
           ],
         ),
@@ -156,6 +226,8 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
+                      controller: _searchController,
+                      onChanged: _filterStudents,
                       decoration: InputDecoration(
                         hintText: 'Cari nama/NIS siswa...',
                         hintStyle: TextStyle(
@@ -173,22 +245,26 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            height: 48,
-            width: 48,
-            decoration: BoxDecoration(
-              gradient: AppTheme.mainGradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: AppTheme.greenGlow,
+          GestureDetector(
+            onTap: _loadStudents,
+            child: Container(
+              height: 48,
+              width: 48,
+              decoration: BoxDecoration(
+                gradient: AppTheme.mainGradient,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppTheme.greenGlow,
+              ),
+              child:
+                  const Icon(Icons.refresh_rounded, color: Colors.white),
             ),
-            child: const Icon(Icons.filter_list_rounded, color: Colors.white),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStudentCard(Map<String, dynamic> student) {
+  Widget _buildStudentCard(GuruTugasStudent student) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -196,11 +272,19 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
           context,
           MaterialPageRoute(
             builder: (_) => GuruTugasReportPage(
-              studentData: student,
+              studentData: {
+                'student_id': student.studentId,
+                'name': student.name,
+                'nis': student.nis,
+                'class_name': student.className,
+              },
               subjectName: widget.subjectName,
             ),
           ),
-        );
+        ).then((_) {
+          // Refresh saat kembali dari report page
+          _loadStudents();
+        });
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -222,7 +306,7 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
               ),
               child: Center(
                 child: Text(
-                  student['name'][0],
+                  student.name.isNotEmpty ? student.name[0] : '?',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -237,7 +321,7 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    student['name'],
+                    student.name,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -246,7 +330,7 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'NIS: ${student['nis']}',
+                    'NIS: ${student.nis}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
