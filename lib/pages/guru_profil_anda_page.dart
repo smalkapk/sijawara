@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/guru_profile_service.dart';
 import '../theme.dart';
 
 class GuruProfilAndaPage extends StatefulWidget {
@@ -15,15 +15,17 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
   late Animation<double> _fadeAnimation;
 
   final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
   bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
   String _userName = '';
-  String _userRole = '';
-  String _className = 'Kelas X'; // TBD: Ambil dari API jika ada
-  
-  // Karena belum ada API khusus guru untuk profil, avatar diset ke default/kosong
-  final String? _avatarUrl = null; 
+  String? _avatarUrl;
+
+  // Data dari API
+  GuruProfileData? _profileData;
 
   @override
   void initState() {
@@ -43,33 +45,42 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
   Future<void> _loadProfile() async {
     setState(() {
       _isLoading = true;
+      _hasError = false;
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      setState(() {
-        _userName = prefs.getString('user_name') ?? 'Guru';
-        _userRole = prefs.getString('user_role') ?? '';
-        
-        _nameController.text = _userName;
-        _phoneController.text = '-'; // TBD
-        
-        _isLoading = false;
-      });
+      final data = await GuruProfileService.getProfile();
+
+      if (mounted) {
+        setState(() {
+          _profileData = data;
+          _userName = data.profile.name;
+          _avatarUrl = data.profile.avatarUrl;
+
+          _nameController.text = data.profile.name;
+          _emailController.text = data.profile.email ?? '-';
+          _phoneController.text = data.profile.phone ?? '-';
+
+          _isLoading = false;
+        });
+      }
+    } on GuruProfileServiceException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = e.message;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Terjadi kesalahan: $e';
         });
       }
     }
-  }
-
-  String get _roleLabel {
-    if (_userRole == 'guru_tahfidz') return 'Guru Tahfidz';
-    if (_userRole == 'guru_kelas') return 'Guru Kelas';
-    return 'Guru';
   }
 
   void _showInfoSnackBar() {
@@ -101,6 +112,7 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
   void dispose() {
     _fadeController.dispose();
     _nameController.dispose();
+    _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -122,7 +134,9 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
                           color: AppTheme.primaryGreen,
                         ),
                       )
-                    : _buildContent(),
+                    : _hasError
+                        ? _buildErrorState()
+                        : _buildContent(),
               ),
             ],
           ),
@@ -180,6 +194,48 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
     );
   }
 
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 56,
+              color: AppTheme.grey400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadProfile,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Coba Lagi'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildContent() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -194,7 +250,7 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
 
           const SizedBox(height: 24),
 
-          // Form fields (Read Only for now)
+          // Form fields (Read Only)
           _buildFormSection(),
 
           const SizedBox(height: 24),
@@ -267,25 +323,25 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
                   bottom: 0,
                   right: 0,
                   child: Container(
-                     width: 32,
-                     height: 32,
-                     decoration: BoxDecoration(
-                       shape: BoxShape.circle,
-                       color: AppTheme.primaryGreen,
-                       border: Border.all(color: Colors.white, width: 2),
-                       boxShadow: [
-                         BoxShadow(
-                           color: AppTheme.primaryGreen.withOpacity(0.3),
-                           blurRadius: 8,
-                           offset: const Offset(0, 2),
-                         ),
-                       ],
-                     ),
-                     child: const Icon(
-                       Icons.camera_alt_rounded,
-                       color: Colors.white,
-                       size: 14,
-                     ),
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.primaryGreen,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryGreen.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
                   ),
                 ),
               ],
@@ -338,7 +394,15 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
             controller: _nameController,
             label: 'Nama Lengkap',
             icon: Icons.person_rounded,
-            readOnly: true, // Karena update belum dibuat db nya
+            readOnly: true,
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: _emailController,
+            label: 'Email',
+            icon: Icons.email_rounded,
+            keyboardType: TextInputType.emailAddress,
+            readOnly: true,
           ),
           const SizedBox(height: 16),
           _buildTextField(
@@ -354,6 +418,12 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
   }
 
   Widget _buildRoleSection() {
+    final positions = _profileData?.positions ?? [];
+
+    if (positions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -373,91 +443,89 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.softPurple.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.work_rounded,
-                  color: AppTheme.softPurple,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _roleLabel,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Tugas Utama',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: AppTheme.grey100),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.class_rounded,
-                  color: AppTheme.primaryGreen,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _className,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Kelas yang diampu',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          ...List.generate(positions.length, (index) {
+            final position = positions[index];
+            return Column(
+              children: [
+                if (index > 0) ...[
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, color: AppTheme.grey100),
+                  const SizedBox(height: 16),
+                ],
+                _buildPositionItem(position),
+              ],
+            );
+          }),
         ],
       ),
+    );
+  }
+
+  Widget _buildPositionItem(GuruPosition position) {
+    // Parse hex color
+    Color iconColor;
+    try {
+      final hex = position.color.replaceAll('#', '');
+      iconColor = Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      iconColor = AppTheme.primaryGreen;
+    }
+
+    // Choose icon based on type
+    IconData iconData;
+    switch (position.icon) {
+      case 'work':
+        iconData = Icons.work_rounded;
+        break;
+      case 'class':
+        iconData = Icons.class_rounded;
+        break;
+      case 'menu_book':
+        iconData = Icons.menu_book_rounded;
+        break;
+      default:
+        iconData = Icons.work_rounded;
+    }
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            iconData,
+            color: iconColor,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                position.title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                position.subtitle,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -493,7 +561,8 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
                 : CrossAxisAlignment.center,
             children: [
               Padding(
-                padding: EdgeInsets.fromLTRB(14, maxLines > 1 ? 14 : 0, 10, 0),
+                padding:
+                    EdgeInsets.fromLTRB(14, maxLines > 1 ? 14 : 0, 10, 0),
                 child: Icon(
                   icon,
                   size: 20,
@@ -508,7 +577,9 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
                   readOnly: readOnly,
                   style: TextStyle(
                     fontSize: 14,
-                    color: readOnly ? AppTheme.textSecondary : AppTheme.textPrimary,
+                    color: readOnly
+                        ? AppTheme.textSecondary
+                        : AppTheme.textPrimary,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
