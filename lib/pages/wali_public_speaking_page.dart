@@ -4,7 +4,8 @@ import '../theme.dart';
 import '../services/public_speaking_service.dart';
 
 class WaliPublicSpeakingPage extends StatefulWidget {
-  const WaliPublicSpeakingPage({super.key});
+  final int? studentId;
+  const WaliPublicSpeakingPage({super.key, this.studentId});
 
   @override
   State<WaliPublicSpeakingPage> createState() => _WaliPublicSpeakingPageState();
@@ -36,7 +37,7 @@ class _WaliPublicSpeakingPageState extends State<WaliPublicSpeakingPage>
   Future<void> _loadNotes() async {
     setState(() => _isLoading = true);
     try {
-      final notes = await PublicSpeakingService.getNotes();
+      final notes = await PublicSpeakingService.getNotes(studentId: widget.studentId);
       if (!mounted) return;
       setState(() {
         _notes = notes;

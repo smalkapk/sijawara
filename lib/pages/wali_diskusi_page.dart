@@ -5,7 +5,8 @@ import '../theme.dart';
 import '../services/diskusi_service.dart';
 
 class WaliDiskusiPage extends StatefulWidget {
-  const WaliDiskusiPage({super.key});
+  final int? studentId;
+  const WaliDiskusiPage({super.key, this.studentId});
 
   @override
   State<WaliDiskusiPage> createState() => _WaliDiskusiPageState();
@@ -37,7 +38,7 @@ class _WaliDiskusiPageState extends State<WaliDiskusiPage>
   Future<void> _loadNotes() async {
     setState(() => _isLoading = true);
     try {
-      final notes = await DiskusiService.getNotes();
+      final notes = await DiskusiService.getNotes(studentId: widget.studentId);
       if (!mounted) return;
       setState(() {
         _notes = notes;

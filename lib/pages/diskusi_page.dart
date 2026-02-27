@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../services/diskusi_service.dart';
 import '../widgets/ps_point_animation.dart';
@@ -21,6 +20,7 @@ class _DiskusiPageState extends State<DiskusiPage>
 
   List<DiskusiNote> _notes = [];
   bool _isLoading = true;
+  int? _selectedNoteIndex;
 
   @override
   void initState() {
@@ -45,6 +45,7 @@ class _DiskusiPageState extends State<DiskusiPage>
       setState(() {
         _notes = notes;
         _isLoading = false;
+        _selectedNoteIndex = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -252,7 +253,7 @@ class _DiskusiPageState extends State<DiskusiPage>
           ),
         ),
       ),
-      floatingActionButton: _notes.isNotEmpty ? _buildFAB() : null,
+      bottomNavigationBar: _buildBottomActions(),
     );
   }
 
@@ -327,29 +328,79 @@ class _DiskusiPageState extends State<DiskusiPage>
     );
   }
 
-  // ── FAB ──
-  Widget _buildFAB() {
-    return Container(
+  // ── Bottom Actions ──
+  Widget _buildBottomActions() {
+    final hasSelection = _selectedNoteIndex != null;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: AppTheme.mainGradient,
-        boxShadow: AppTheme.greenGlow,
+        color: AppTheme.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, -10),
+          ),
+        ],
       ),
-      child: FloatingActionButton(
-        onPressed: () {
-          HapticFeedback.mediumImpact();
-          _openAddForm();
-        },
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        highlightElevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: const Icon(
-          Icons.add_rounded,
-          color: Colors.white,
-          size: 28,
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  if (hasSelection) {
+                    final selectedNote = _notes[_selectedNoteIndex!];
+                    _openEditForm(selectedNote);
+                  } else {
+                    _openAddForm();
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: hasSelection ? null : AppTheme.mainGradient,
+                    color: hasSelection ? AppTheme.gold : null,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    boxShadow: hasSelection
+                        ? [
+                            BoxShadow(
+                                color: AppTheme.gold.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4))
+                          ]
+                        : AppTheme.greenGlow,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        hasSelection
+                            ? Icons.edit_document
+                            : Icons.add_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        hasSelection ? 'Edit Catatan' : 'Tambah Catatan',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -413,40 +464,12 @@ class _DiskusiPageState extends State<DiskusiPage>
             ),
             const SizedBox(height: 8),
             Text(
-              'Tekan tombol + untuk menambahkan\ncatatan diskusi baru',
+              'Tekan tombol di bawah untuk menambahkan\ncatatan diskusi baru',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 color: AppTheme.grey400,
                 height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 28),
-            GestureDetector(
-              onTap: _openAddForm,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.mainGradient,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: AppTheme.greenGlow,
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Buat Catatan Pertama',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
@@ -476,8 +499,9 @@ class _DiskusiPageState extends State<DiskusiPage>
 
   // ── Note Card ──
   Widget _buildNoteCard(DiskusiNote note, int index) {
-    final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
-    final formattedDate = dateFormat.format(note.date);
+    final isSelected = _selectedNoteIndex == index;
+    final formattedDate =
+        "${note.date.day.toString().padLeft(2, '0')}-${note.date.month.toString().padLeft(2, '0')}-${note.date.year}";
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -493,373 +517,260 @@ class _DiskusiPageState extends State<DiskusiPage>
         );
       },
       child: GestureDetector(
-        onTap: () => _openEditForm(note),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          setState(() {
+            if (_selectedNoteIndex == index) {
+              _selectedNoteIndex = null;
+            } else {
+              _selectedNoteIndex = index;
+            }
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.white,
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
+            color: isSelected
+                ? AppTheme.primaryGreen.withOpacity(0.05)
+                : AppTheme.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
+                : AppTheme.softShadow,
+            border: Border.all(
+              color: isSelected ? AppTheme.primaryGreen : AppTheme.grey100,
+              width: isSelected ? 2 : 1,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Date header strip
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.mainGradient,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_rounded,
-                      color: Colors.white70,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        formattedDate,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _deleteNote(note);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: Colors.white70,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Judul
-                    if (note.judul.isNotEmpty) ...[
-                      Text(
-                        note.judul,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 12),
-                      Container(height: 1, color: AppTheme.grey100),
-                      const SizedBox(height: 12),
-                    ],
-                    // Materi
-                    Row(
+              // Header row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppTheme.primaryGreen.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
+                            color: AppTheme.softPurple.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            Icons.subject_rounded,
-                            size: 16,
-                            color: AppTheme.primaryGreen,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Materi',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.grey400,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                note.materi.isNotEmpty
-                                    ? note.materi
-                                    : '(Belum diisi)',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: note.materi.isNotEmpty
-                                      ? AppTheme.textPrimary
-                                      : AppTheme.grey400,
-                                  height: 1.4,
-                                ),
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-                    Container(height: 1, color: AppTheme.grey100),
-                    const SizedBox(height: 12),
-
-                    // Mentor
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.softPurple.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.person_rounded,
-                            size: 16,
+                            Icons.menu_book_rounded,
                             color: AppTheme.softPurple,
+                            size: 20,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Mentor',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.grey400,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                note.mentor.isNotEmpty
-                                    ? note.mentor
-                                    : '(Belum diisi)',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: note.mentor.isNotEmpty
-                                      ? AppTheme.textPrimary
-                                      : AppTheme.grey400,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            note.judul.isNotEmpty
+                                ? note.judul
+                                : 'Tanpa Judul',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
                         ),
-                        if (note.mentor.isEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.gold.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Menunggu',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.gold,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
-
-                    // Note section
-                    if (note.note.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Container(height: 1, color: AppTheme.grey100),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: AppTheme.teal.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.note_rounded,
-                              size: 16,
-                              color: AppTheme.teal,
-                            ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formattedDate,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.grey400,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _deleteNote(note);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Catatan',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.grey400,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  note.note,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppTheme.textPrimary,
-                                    height: 1.4,
-                                  ),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.red.shade400,
+                            size: 16,
                           ),
-                        ],
+                        ),
                       ),
                     ],
-
-                    // Signature indicator
-                    const SizedBox(height: 12),
-                    Container(height: 1, color: AppTheme.grey100),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF3B82F6).withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.draw_rounded,
-                            size: 16,
-                            color: Color(0xFF3B82F6),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tanda Tangan Mentor',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.grey400,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              if (note.signatureBase64.isNotEmpty)
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    height: 60,
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      border: Border.all(
-                                        color: AppTheme.grey200,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Image.memory(
-                                      base64Decode(note.signatureBase64),
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                )
-                              else
-                                Text(
-                                  '(Belum ditandatangani)',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppTheme.grey400,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        if (note.signatureBase64.isEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Wajib',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.red,
-                              ),
-                            ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Sudah TTD',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.primaryGreen,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 20),
+              // Content items
+              _buildReportItem(
+                'Materi',
+                note.materi.isNotEmpty ? note.materi : '(Belum diisi)',
+              ),
+              _buildCardDivider(),
+              _buildReportItem(
+                'Mentor',
+                note.mentor.isNotEmpty
+                    ? note.mentor
+                    : '(Belum diisi)',
+              ),
+              if (note.note.isNotEmpty) ...[
+                _buildCardDivider(),
+                _buildReportItem('Catatan', note.note),
+              ],
+              // Signature section
+              _buildCardDivider(),
+              _buildSignatureItem(note),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildReportItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.grey400,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+            height: 1.4,
+          ),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Container(
+        height: 1,
+        color: AppTheme.grey100,
+      ),
+    );
+  }
+
+  Widget _buildSignatureItem(DiskusiNote note) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Tanda Tangan Mentor',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.grey400,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const Spacer(),
+            if (note.signatureBase64.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Wajib',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red,
+                  ),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Sudah TTD',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (note.signatureBase64.isNotEmpty)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              height: 60,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: AppTheme.grey200),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Image.memory(
+                base64Decode(note.signatureBase64),
+                fit: BoxFit.contain,
+              ),
+            ),
+          )
+        else
+          Text(
+            '(Belum ditandatangani)',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.grey400,
+            ),
+          ),
+      ],
     );
   }
 }

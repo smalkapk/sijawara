@@ -6,7 +6,7 @@ import '../widgets/wali_student_profile.dart';
 import '../widgets/wali_ibadah_status.dart';
 import '../widgets/wali_guru_input.dart';
 import '../widgets/wali_fitur_grid.dart';
-import '../widgets/wali_pengumuman_widget.dart';
+import '../widgets/wali_maklumat_widget.dart';
 import 'wali_live_page.dart';
 import 'wali_profile_page.dart';
 import '../widgets/skeleton_loader.dart';
@@ -263,10 +263,12 @@ class _WaliHomePageState extends State<WaliHomePage>
                               Transform.translate(
                                 offset: const Offset(0, -20),
                                 child: Column(
-                                  children: const [
-                                    WaliPengumumanWidget(),
-                                    SizedBox(height: 16),
-                                    WaliFiturGrid(),
+                                  children: [
+                                    const WaliMaklumatWidget(),
+                                    const SizedBox(height: 16),
+                                    WaliFiturGrid(
+                                      studentId: _dashboardData?.selectedChild?.studentId,
+                                    ),
                                   ],
                                 ),
                               ),

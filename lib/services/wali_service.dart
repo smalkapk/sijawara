@@ -903,6 +903,10 @@ class WaliTimelineEvent {
   final String? badge;
   final String? detail;
 
+  /// Data evaluasi guru (hanya ada kalau type == 'evaluasi')
+  final int? evaluasiId;
+  final Map<String, dynamic>? evaluasiData;
+
   WaliTimelineEvent({
     required this.description,
     required this.timestamp,
@@ -910,6 +914,8 @@ class WaliTimelineEvent {
     required this.type,
     this.badge,
     this.detail,
+    this.evaluasiId,
+    this.evaluasiData,
   });
 
   factory WaliTimelineEvent.fromJson(Map<String, dynamic> json) {
@@ -920,6 +926,10 @@ class WaliTimelineEvent {
       type: json['type'] ?? '',
       badge: json['badge'],
       detail: json['detail'],
+      evaluasiId: json['evaluasi_id'] is int ? json['evaluasi_id'] : null,
+      evaluasiData: json['evaluasi_data'] is Map<String, dynamic>
+          ? json['evaluasi_data']
+          : null,
     );
   }
 

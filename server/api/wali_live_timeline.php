@@ -345,6 +345,48 @@ try {
         ];
     }
 
+    // ── 3j. Evaluasi Guru ──
+    $stmtEval = $pdo->prepare(
+        'SELECT g.id, g.evaluasi_number, g.bulan, g.nilai_data, g.keterangan_data,
+                g.catatan, g.evaluasi_date, g.created_at,
+                u.name AS guru_name
+         FROM guru_evaluasi_logs g
+         JOIN users u ON g.guru_id = u.id
+         WHERE g.student_id = :sid AND DATE(g.created_at) = :d
+         ORDER BY g.created_at ASC'
+    );
+    $stmtEval->execute(['sid' => $studentId, 'd' => $date]);
+    $evaluasis = $stmtEval->fetchAll();
+
+    foreach ($evaluasis as $ev) {
+        $ordinals = ['', 'Pertama', 'Kedua', 'Ketiga', 'Keempat', 'Kelima',
+                      'Keenam', 'Ketujuh', 'Kedelapan', 'Kesembilan', 'Kesepuluh',
+                      'Kesebelas', 'Kedua Belas'];
+        $ordLabel = isset($ordinals[$ev['evaluasi_number']]) ? $ordinals[$ev['evaluasi_number']] : "Ke-{$ev['evaluasi_number']}";
+
+        $events[] = [
+            'group'       => 'Evaluasi',
+            'description' => "Wali Kelas {$ev['guru_name']} melaporkan Evaluasi {$ordLabel} ({$ev['bulan']})",
+            'timestamp'   => $ev['created_at'],
+            'points'      => 0,
+            'type'        => 'evaluasi',
+            'badge'       => null,
+            'detail'      => 'Buka',
+            'evaluasi_id' => (int) $ev['id'],
+            'evaluasi_data' => [
+                'id'               => (int) $ev['id'],
+                'evaluasi_number'  => (int) $ev['evaluasi_number'],
+                'bulan'            => $ev['bulan'],
+                'nilai_data'       => $ev['nilai_data'],
+                'keterangan_data'  => $ev['keterangan_data'],
+                'catatan'          => $ev['catatan'] ?? '',
+                'evaluasi_date'    => $ev['evaluasi_date'],
+                'guru_name'        => $ev['guru_name'],
+                'created_at'       => $ev['created_at'],
+            ],
+        ];
+    }
+
     // ═══════════════════════════════════════
     // 4. Sort events by timestamp (newest first)
     // ═══════════════════════════════════════
@@ -357,7 +399,7 @@ try {
     // ═══════════════════════════════════════
     $timeline = [];
     foreach ($events as $ev) {
-        $timeline[] = [
+        $item = [
             'description' => $ev['description'],
             'timestamp'   => $ev['timestamp'],
             'points'      => $ev['points'],
@@ -365,6 +407,12 @@ try {
             'badge'       => $ev['badge'] ?? null,
             'detail'      => $ev['detail'] ?? null,
         ];
+        // Tambahkan data evaluasi jika tipe = evaluasi
+        if (isset($ev['evaluasi_id'])) {
+            $item['evaluasi_id']   = $ev['evaluasi_id'];
+            $item['evaluasi_data'] = $ev['evaluasi_data'];
+        }
+        $timeline[] = $item;
     }
 
     // ═══════════════════════════════════════

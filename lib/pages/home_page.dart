@@ -9,6 +9,7 @@ import '../widgets/bottom_menu.dart';
 import '../widgets/monthly_calendar.dart';
 import '../widgets/point_animation.dart';
 import '../widgets/skeleton_loader.dart';
+import '../widgets/wali_maklumat_widget.dart';
 import '../services/prayer_service.dart';
 import '../services/auth_service.dart';
 import 'quran_page.dart';
@@ -510,7 +511,14 @@ class _HomePageState extends State<HomePage>
                     const SizedBox(height: 28),
                     _isLoadingData
                         ? const MenuButtonsSkeleton()
-                        : const MenuButtonsSection(),
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              WaliMaklumatWidget(),
+                              SizedBox(height: 16),
+                              MenuButtonsSection(),
+                            ],
+                          ),
                     const SizedBox(height: 120),
                   ],
                 ),

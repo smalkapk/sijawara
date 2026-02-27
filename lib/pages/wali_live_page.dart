@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../services/wali_service.dart';
+import '../services/evaluasi_view_service.dart';
 import '../widgets/skeleton_loader.dart';
+import '../widgets/evaluasi_result_card.dart';
 
 class WaliLivePage extends StatefulWidget {
   const WaliLivePage({super.key, this.studentId});
@@ -712,6 +714,14 @@ class _WaliLivePageState extends State<WaliLivePage> {
   }
 
   // ── Icon & color based on event type ──
+
+  /// Buka bottom-sheet evaluasi dari data yang tertanam di timeline event.
+  void _openEvaluasiBottomSheet(WaliTimelineEvent event) {
+    if (event.evaluasiData == null) return;
+    final report = EvaluasiViewReport.fromJson(event.evaluasiData!);
+    showEvaluasiBottomSheet(context, report);
+  }
+
   IconData _getEventIcon(String type) {
     switch (type) {
       case 'shalat':
@@ -736,6 +746,8 @@ class _WaliLivePageState extends State<WaliLivePage> {
         return Icons.bookmark_rounded;
       case 'jurnal':
         return Icons.edit_note_rounded;
+      case 'evaluasi':
+        return Icons.assignment_turned_in_rounded;
       default:
         return Icons.circle;
     }
@@ -765,6 +777,8 @@ class _WaliLivePageState extends State<WaliLivePage> {
         return const Color(0xFF7C3AED);
       case 'jurnal':
         return const Color(0xFF64748B);
+      case 'evaluasi':
+        return AppTheme.softBlue;
       default:
         return AppTheme.grey400;
     }
@@ -865,15 +879,52 @@ class _WaliLivePageState extends State<WaliLivePage> {
                   // Detail
                   if (event.detail != null) ...[
                     const SizedBox(height: 6),
-                    Text(
-                      event.detail!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                        color: AppTheme.grey400,
-                        fontStyle: FontStyle.italic,
+                    if (event.type == 'evaluasi' &&
+                        event.evaluasiData != null) ...[
+                      GestureDetector(
+                        onTap: () => _openEvaluasiBottomSheet(event),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.softBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppTheme.softBlue.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.open_in_new_rounded,
+                                size: 12,
+                                color: AppTheme.softBlue,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Buka Evaluasi',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.softBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    ] else ...[
+                      Text(
+                        event.detail!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          color: AppTheme.grey400,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ],
 
                   // Points

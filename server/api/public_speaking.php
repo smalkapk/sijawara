@@ -26,7 +26,9 @@ if (empty($token)) {
     exit;
 }
 
-$student = getStudentFromToken($pdo, $token);
+// Mendukung siswa maupun orang_tua (wali)
+$requestedStudentId = isset($_GET['student_id']) ? (int) $_GET['student_id'] : null;
+$student = resolveStudentFromToken($pdo, $token, $requestedStudentId);
 if (!$student) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Siswa tidak ditemukan']);

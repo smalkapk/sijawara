@@ -4,6 +4,7 @@ import '../theme.dart';
 import '../pages/guru_alka_ai_page.dart';
 import '../pages/guru_bantuan_page.dart';
 import '../pages/guru_sp_student_list_page.dart';
+import '../pages/guru_evaluasi_list_page.dart';
 
 class GuruFiturGrid extends StatelessWidget {
   const GuruFiturGrid({super.key});
@@ -113,11 +114,17 @@ class GuruFiturGrid extends StatelessWidget {
                     },
                   ),
                   buildGridItem(
-                    'Laporkan Aplikasi',
-                    Icons.bug_report_rounded,
+                    'Evaluasi',
+                    Icons.check_circle,
                     AppTheme.softBlue,
                     onTap: () {
                       HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GuruEvaluasiListPage(),
+                        ),
+                      );
                     },
                   ),
                   buildGridItem(

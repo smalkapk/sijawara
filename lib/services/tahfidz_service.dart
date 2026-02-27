@@ -441,4 +441,63 @@ class TahfidzService {
       return [];
     }
   }
+
+  // ═══════════════════════════════════════
+  // GET: Riwayat setoran anak (wali / orang_tua)
+  // ═══════════════════════════════════════
+  static const String _waliSetoranCachePrefix = 'tahfidz_wali_setoran_';
+
+  static Future<List<TahfidzSetoran>> getWaliSetoran({int? studentId}) async {
+    try {
+      final token = await AuthService.getToken();
+      String url = '$_baseUrl/tahfidz.php?action=wali_setoran';
+      if (studentId != null) {
+        url += '&student_id=$studentId';
+      }
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List<dynamic> dataList = body['data'] ?? [];
+        final reports =
+            dataList.map((e) => TahfidzSetoran.fromJson(e)).toList();
+        await _saveWaliSetoranToCache(studentId ?? 0, reports);
+        return reports;
+      }
+    } on TimeoutException {
+      debugPrint('Tahfidz: timeout wali_setoran, pakai cache');
+    } catch (e) {
+      debugPrint('Tahfidz: gagal fetch wali_setoran ($e), pakai cache');
+    }
+    return _getWaliSetoranFromCache(studentId ?? 0);
+  }
+
+  static Future<void> _saveWaliSetoranToCache(
+      int studentId, List<TahfidzSetoran> reports) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = reports.map((r) => r.toJson()).toList();
+      await prefs.setString(
+          '$_waliSetoranCachePrefix$studentId', jsonEncode(jsonList));
+    } catch (_) {}
+  }
+
+  static Future<List<TahfidzSetoran>> _getWaliSetoranFromCache(
+      int studentId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_waliSetoranCachePrefix$studentId');
+      if (raw == null) return [];
+      final List<dynamic> list = jsonDecode(raw);
+      return list.map((e) => TahfidzSetoran.fromJson(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
 }

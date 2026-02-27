@@ -4,13 +4,15 @@ import '../theme.dart';
 import '../pages/wali_tugas_siswa_page.dart';
 import '../pages/wali_maklumat_page.dart';
 import '../pages/wali_diskusi_guru_page.dart';
-import '../pages/wali_aduan_aplikasi_page.dart';
+import '../pages/wali_tahfidz_page.dart';
 import '../pages/wali_bantuan_page.dart';
 import '../pages/wali_alka_ai_page.dart';
 import '../pages/wali_sp_siswa_page.dart';
+import '../pages/wali_evaluasi_page.dart';
 
 class WaliFiturGrid extends StatelessWidget {
-  const WaliFiturGrid({super.key});
+  final int? studentId;
+  const WaliFiturGrid({super.key, this.studentId});
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +121,7 @@ class WaliFiturGrid extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const WaliTugasSiswaPage(),
+                          builder: (_) => WaliTugasSiswaPage(studentId: studentId),
                         ),
                       );
                     },
@@ -153,15 +155,15 @@ class WaliFiturGrid extends StatelessWidget {
                     },
                   ),
                   buildGridItem(
-                    'Aduan Aplikasi',
-                    Icons.bug_report_rounded,
+                    'Tahfidz',
+                    Icons.menu_book_rounded,
                     AppTheme.softPurple,
                     onTap: () {
                       HapticFeedback.lightImpact();
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const WaliAduanAplikasiPage(),
+                          builder: (_) => WaliTahfidzPage(studentId: studentId),
                         ),
                       );
                     },
@@ -204,6 +206,20 @@ class WaliFiturGrid extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => const WaliSpSiswaPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  buildGridItem(
+                    'Evaluasi',
+                    Icons.task_alt_rounded,
+                    AppTheme.softBlue,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WaliEvaluasiPage(),
                         ),
                       );
                     },

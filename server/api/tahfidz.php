@@ -7,6 +7,7 @@
 // GET    ?action=students                 -> daftar siswa (guru)
 // GET    ?action=reports&student_id=X     -> riwayat setoran siswa (guru)
 // GET    ?action=my_setoran               -> riwayat setoran sendiri (siswa)
+// GET    ?action=wali_setoran[&student_id=X] -> riwayat setoran anak (orang_tua)
 // POST                                    -> simpan / update setoran
 // DELETE ?id=X                            -> hapus setoran
 
@@ -299,8 +300,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
+    // ── GET Wali Setoran (orang_tua melihat riwayat setoran anak) ──
+    if ($action === 'wali_setoran') {
+        if ($user['role'] !== 'orang_tua') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Akses ditolak']);
+            exit;
+        }
+
+        // Resolve student_id dari parent_student
+        $requestedStudentId = isset($_GET['student_id']) ? (int) $_GET['student_id'] : null;
+
+        if ($requestedStudentId) {
+            // Validasi anak ini milik parent ini
+            $stmtChild = $pdo->prepare(
+                'SELECT s.id FROM parent_student ps
+                 JOIN students s ON ps.student_id = s.id
+                 WHERE ps.parent_id = :uid AND s.id = :sid LIMIT 1'
+            );
+            $stmtChild->execute(['uid' => $userId, 'sid' => $requestedStudentId]);
+            $childRow = $stmtChild->fetch();
+        } else {
+            // Ambil anak pertama
+            $stmtChild = $pdo->prepare(
+                'SELECT s.id FROM parent_student ps
+                 JOIN students s ON ps.student_id = s.id
+                 WHERE ps.parent_id = :uid LIMIT 1'
+            );
+            $stmtChild->execute(['uid' => $userId]);
+            $childRow = $stmtChild->fetch();
+        }
+
+        if (!$childRow) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Data anak tidak ditemukan']);
+            exit;
+        }
+
+        $studentId = $childRow['id'];
+
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT ts.id, ts.surah_number, ts.ayat_from, ts.ayat_to,
+                        ts.grade, ts.notes, ts.points_earned, ts.setoran_at,
+                        u.name AS guru_name
+                 FROM tahfidz_setoran ts
+                 LEFT JOIN users u ON ts.guru_tahfidz_id = u.id
+                 WHERE ts.student_id = :sid
+                 ORDER BY ts.setoran_at DESC'
+            );
+            $stmt->execute(['sid' => $studentId]);
+            $rows = $stmt->fetchAll();
+
+            $reports = [];
+            foreach ($rows as $r) {
+                $reports[] = [
+                    'id'           => (string) $r['id'],
+                    'surah_number' => (int) $r['surah_number'],
+                    'ayat_from'    => (int) $r['ayat_from'],
+                    'ayat_to'      => (int) $r['ayat_to'],
+                    'grade'        => dbToGrade($r['grade']),
+                    'grade_label'  => dbToGradeLabel($r['grade']),
+                    'notes'        => $r['notes'] ?? '',
+                    'points'       => (int) $r['points_earned'],
+                    'guru_name'    => $r['guru_name'] ?? '',
+                    'setoran_at'   => $r['setoran_at'],
+                ];
+            }
+
+            echo json_encode(['success' => true, 'data' => $reports]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Gagal mengambil data setoran']);
+        }
+        exit;
+    }
+
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Parameter action tidak valid (students/reports/my_setoran)']);
+    echo json_encode(['success' => false, 'message' => 'Parameter action tidak valid (students/reports/my_setoran/wali_setoran)']);
     exit;
 }
 

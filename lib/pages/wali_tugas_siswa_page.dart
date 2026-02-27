@@ -5,7 +5,8 @@ import 'wali_public_speaking_page.dart';
 import 'wali_diskusi_page.dart';
 
 class WaliTugasSiswaPage extends StatefulWidget {
-  const WaliTugasSiswaPage({super.key});
+  final int? studentId;
+  const WaliTugasSiswaPage({super.key, this.studentId});
 
   @override
   State<WaliTugasSiswaPage> createState() => _WaliTugasSiswaPageState();
@@ -72,7 +73,7 @@ class _WaliTugasSiswaPageState extends State<WaliTugasSiswaPage>
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const WaliDiskusiPage(),
+                            builder: (_) => WaliDiskusiPage(studentId: widget.studentId),
                           ),
                         );
                       },
@@ -87,7 +88,7 @@ class _WaliTugasSiswaPageState extends State<WaliTugasSiswaPage>
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const WaliPublicSpeakingPage(),
+                            builder: (_) => WaliPublicSpeakingPage(studentId: widget.studentId),
                           ),
                         );
                       },

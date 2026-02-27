@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/maklumat_service.dart';
 
 class GuruMaklumatFormPage extends StatefulWidget {
   const GuruMaklumatFormPage({super.key});
@@ -17,11 +18,18 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
   final _judulController = TextEditingController();
   final _deskripsiController = TextEditingController();
   String _selectedPriority = 'Sedang'; // Default
+  String _selectedTarget = 'keduanya'; // Default kirim kepada
+  String _selectedIcon = 'campaign'; // Default icon
   bool _hasImage = false;
   bool _hasPdf = false;
   bool _isSaving = false;
 
   final List<String> _priorities = ['Tinggi', 'Sedang', 'Rendah'];
+  final List<Map<String, String>> _targets = [
+    {'value': 'siswa', 'label': 'Siswa'},
+    {'value': 'orang_tua', 'label': 'Orang Tua / Wali'},
+    {'value': 'keduanya', 'label': 'Keduanya'},
+  ];
 
   @override
   void initState() {
@@ -45,7 +53,7 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
     super.dispose();
   }
 
-  void _kirimForm() {
+  void _kirimForm() async {
     HapticFeedback.mediumImpact();
     if (_judulController.text.isEmpty || _deskripsiController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,11 +74,19 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
       ),
     );
 
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      await MaklumatService.createMaklumat(
+        judul: _judulController.text.trim(),
+        deskripsi: _deskripsiController.text.trim(),
+        prioritas: _selectedPriority,
+        targetAudience: _selectedTarget,
+        icon: _selectedIcon,
+      );
+
       if (mounted) {
         setState(() => _isSaving = false);
         Navigator.pop(context); // Close loading
-        Navigator.pop(context); // Go back to maklumat page
+        Navigator.pop(context, true); // Go back with result = true
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Maklumat berhasil dikirim'),
@@ -82,7 +98,18 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
           ),
         );
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengirim: $e'),
+            backgroundColor: Colors.red.shade400,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -107,6 +134,10 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
                       _buildInputField('Deskripsi', _deskripsiController, Icons.subject_rounded, maxLines: 5),
                       const SizedBox(height: 16),
                       _buildPriorityPicker(),
+                      const SizedBox(height: 16),
+                      _buildTargetAudiencePicker(),
+                      const SizedBox(height: 16),
+                      _buildIconPicker(),
                       const SizedBox(height: 16),
                       _buildAttachmentField(
                         title: 'Gambar Sampul',
@@ -340,6 +371,284 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
         ),
       ],
     );
+  }
+
+  Widget _buildTargetAudiencePicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+           children: [
+             const Icon(Icons.people_rounded, size: 16, color: AppTheme.primaryGreen),
+             const SizedBox(width: 8),
+             const Text(
+              'Kirim Kepada',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+              ),
+             ),
+           ]
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _targets.map((target) {
+            final isSelected = _selectedTarget == target['value'];
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() => _selectedTarget = target['value']!);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppTheme.primaryGreen.withOpacity(0.08)
+                      : AppTheme.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected ? AppTheme.primaryGreen : AppTheme.grey100,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.primaryGreen.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSelected
+                          ? Icons.check_circle_rounded
+                          : _getTargetIcon(target['value']!),
+                      size: 18,
+                      color: isSelected
+                          ? AppTheme.primaryGreen
+                          : AppTheme.grey400,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      target['label']!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? AppTheme.primaryGreen
+                            : AppTheme.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  IconData _getTargetIcon(String target) {
+    switch (target) {
+      case 'siswa':
+        return Icons.school_rounded;
+      case 'orang_tua':
+        return Icons.family_restroom_rounded;
+      case 'keduanya':
+        return Icons.groups_rounded;
+      default:
+        return Icons.people_rounded;
+    }
+  }
+
+  Widget _buildIconPicker() {
+    final entries = maklumatIconMap.entries.toList();
+    final selectedEntry = maklumatIconMap[_selectedIcon];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.emoji_emotions_rounded, size: 16, color: AppTheme.primaryGreen),
+            const SizedBox(width: 8),
+            const Text(
+              'Icon Maklumat',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Preview selected icon
+        if (selectedEntry != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: selectedEntry.$2.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selectedEntry.$2.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: selectedEntry.$2.withOpacity(0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(selectedEntry.$1, color: selectedEntry.$2, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Icon terpilih',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.grey400,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _iconLabel(_selectedIcon),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: selectedEntry.$2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  'Ganti',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: selectedEntry.$2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Icon grid
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(color: AppTheme.grey100, width: 1),
+          ),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: entries.map((entry) {
+              final key = entry.key;
+              final iconData = entry.value.$1;
+              final color = entry.value.$2;
+              final isSelected = _selectedIcon == key;
+
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _selectedIcon = key);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? color.withOpacity(0.12)
+                        : AppTheme.bgColor,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected ? color : Colors.transparent,
+                      width: isSelected ? 2 : 0,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: color.withOpacity(0.15),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      iconData,
+                      size: 24,
+                      color: isSelected ? color : AppTheme.grey400,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _iconLabel(String key) {
+    const labels = {
+      'campaign': 'Pengumuman',
+      'school': 'Akademik',
+      'event': 'Acara',
+      'info': 'Informasi',
+      'warning': 'Peringatan',
+      'celebration': 'Perayaan',
+      'menu_book': 'Tugas / Buku',
+      'emoji_events': 'Kejuaraan',
+      'mosque': 'Keagamaan',
+      'groups': 'Komunitas',
+      'health': 'Kesehatan',
+      'payments': 'Pembayaran',
+      'directions_bus': 'Transportasi',
+      'restaurant': 'Kantin',
+      'schedule': 'Jadwal',
+      'verified': 'Resmi',
+    };
+    return labels[key] ?? key;
   }
 
   Widget _buildAttachmentField({

@@ -78,11 +78,15 @@ class PublicSpeakingService {
   // ═══════════════════════════════════════
   // GET: Ambil semua catatan
   // ═══════════════════════════════════════
-  static Future<List<PublicSpeakingNote>> getNotes() async {
+  static Future<List<PublicSpeakingNote>> getNotes({int? studentId}) async {
     try {
       final token = await AuthService.getToken();
+      String url = '$_baseUrl/public_speaking.php';
+      if (studentId != null) {
+        url += '?student_id=$studentId';
+      }
       final response = await http.get(
-        Uri.parse('$_baseUrl/public_speaking.php'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

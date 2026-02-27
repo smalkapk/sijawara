@@ -86,11 +86,15 @@ class DiskusiService {
   // ═══════════════════════════════════════
   // GET: Ambil semua catatan
   // ═══════════════════════════════════════
-  static Future<List<DiskusiNote>> getNotes() async {
+  static Future<List<DiskusiNote>> getNotes({int? studentId}) async {
     try {
       final token = await AuthService.getToken();
+      String url = '$_baseUrl/diskusi.php';
+      if (studentId != null) {
+        url += '?student_id=$studentId';
+      }
       final response = await http.get(
-        Uri.parse('$_baseUrl/diskusi.php'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
