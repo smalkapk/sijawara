@@ -49,6 +49,7 @@ class SurahDetailPage extends StatefulWidget {
   final String surahName;
   final String arabicName;
   final int? initialAyat; // for auto-scroll to bookmarked ayat
+  final bool disableLongPress; // hide long-press bottom sheet (e.g. tahfidz mode)
 
   const SurahDetailPage({
     super.key,
@@ -56,6 +57,7 @@ class SurahDetailPage extends StatefulWidget {
     required this.surahName,
     required this.arabicName,
     this.initialAyat,
+    this.disableLongPress = false,
   });
 
   @override
@@ -772,7 +774,7 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
     final isRead = _readAyats.contains(ayat.nomorAyat);
 
     return GestureDetector(
-      onLongPress: () => _showAyatOptions(ayat),
+      onLongPress: widget.disableLongPress ? null : () => _showAyatOptions(ayat),
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
         decoration: BoxDecoration(

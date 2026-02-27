@@ -7,6 +7,7 @@ import 'pages/onboarding_page.dart';
 import 'pages/login_page.dart';
 import 'pages/wali_home_page.dart';
 import 'pages/guru_home_page.dart';
+import 'pages/guru_tahfidz_home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,7 +48,9 @@ class MainApp extends StatelessWidget {
       home = const LoginPage();
     } else if (userRole == 'orang_tua') {
       home = const WaliHomePage();
-    } else if (userRole == 'guru_tahfidz' || userRole == 'guru_kelas') {
+    } else if (userRole == 'guru_tahfidz') {
+      home = const GuruTahfidzHomePage();
+    } else if (userRole == 'guru_kelas') {
       home = const GuruHomePage();
     } else {
       home = const HomePage();

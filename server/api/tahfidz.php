@@ -4,6 +4,8 @@
 //
 // Tabel: tahfidz_setoran, tahfidz_targets
 //
+// GET    ?action=classes                   -> daftar kelas (guru_tahfidz)
+// GET    ?action=class_students&class_id=X -> daftar siswa per kelas (guru_tahfidz)
 // GET    ?action=students                 -> daftar siswa (guru)
 // GET    ?action=reports&student_id=X     -> riwayat setoran siswa (guru)
 // GET    ?action=my_setoran               -> riwayat setoran sendiri (siswa)
@@ -143,6 +145,90 @@ function recalcTotalPoints($pdo, $studentId) {
 // ════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $action = $_GET['action'] ?? '';
+
+    // ── GET Classes (guru_tahfidz: kelas yang punya siswa di-assign) ──
+    if ($action === 'classes') {
+        if ($user['role'] !== 'guru_tahfidz') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Akses ditolak']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT DISTINCT c.id, c.name, c.academic_year,
+                        COUNT(s.id) AS student_count
+                 FROM classes c
+                 JOIN students s ON s.class_id = c.id
+                 WHERE s.guru_tahfidz_id = :guru_id
+                 GROUP BY c.id, c.name, c.academic_year
+                 ORDER BY c.name ASC'
+            );
+            $stmt->execute(['guru_id' => $userId]);
+            $rows = $stmt->fetchAll();
+
+            $classes = [];
+            foreach ($rows as $r) {
+                $classes[] = [
+                    'id'            => (int) $r['id'],
+                    'name'          => $r['name'],
+                    'academic_year' => $r['academic_year'] ?? '',
+                    'student_count' => (int) $r['student_count'],
+                ];
+            }
+
+            echo json_encode(['success' => true, 'data' => $classes]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Gagal mengambil data kelas']);
+        }
+        exit;
+    }
+
+    // ── GET Class Students (guru_tahfidz: siswa per kelas) ──
+    if ($action === 'class_students') {
+        if ($user['role'] !== 'guru_tahfidz') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Akses ditolak']);
+            exit;
+        }
+
+        $classId = $_GET['class_id'] ?? null;
+        if (!$classId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'class_id diperlukan']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare(
+                'SELECT s.id AS student_id, s.nis, u.name AS student_name, c.name AS class_name
+                 FROM students s
+                 JOIN users u ON s.user_id = u.id
+                 LEFT JOIN classes c ON s.class_id = c.id
+                 WHERE s.guru_tahfidz_id = :guru_id AND s.class_id = :class_id
+                 ORDER BY u.name ASC'
+            );
+            $stmt->execute(['guru_id' => $userId, 'class_id' => $classId]);
+            $rows = $stmt->fetchAll();
+
+            $students = [];
+            foreach ($rows as $r) {
+                $students[] = [
+                    'student_id' => (int) $r['student_id'],
+                    'nis'        => $r['nis'] ?? '',
+                    'name'       => $r['student_name'],
+                    'class_name' => $r['class_name'] ?? '',
+                ];
+            }
+
+            echo json_encode(['success' => true, 'data' => $students]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Gagal mengambil data siswa']);
+        }
+        exit;
+    }
 
     // ── GET Students (guru only) ──
     if ($action === 'students') {

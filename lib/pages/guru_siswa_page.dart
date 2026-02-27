@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/guru_tugas_service.dart';
 import 'guru_tugas_report_page.dart';
 import 'guru_kelas_tahfidz_report_page.dart';
 
@@ -12,15 +13,71 @@ class GuruSiswaPage extends StatefulWidget {
 }
 
 class _GuruSiswaPageState extends State<GuruSiswaPage> {
-  // Dummy student data
-  final List<Map<String, dynamic>> _students = [
-    {'name': 'Ahmad Fauzi'},
-    {'name': 'Siti Aisyah'},
-    {'name': 'Budi Santoso'},
-    {'name': 'Farah Nisa'},
-    {'name': 'Ammar Malik'},
-    {'name': 'Dina Mulyani'},
-  ];
+  List<GuruTugasStudent> _allStudents = [];
+  List<GuruTugasStudent> _filteredStudents = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadStudents() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final students = await GuruTugasService.getStudents();
+      if (!mounted) return;
+      setState(() {
+        _allStudents = students;
+        _filteredStudents = students;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Gagal memuat data siswa';
+      });
+      debugPrint('Gagal load siswa: $e');
+    }
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.toLowerCase().trim();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredStudents = _allStudents;
+      } else {
+        _filteredStudents = _allStudents
+            .where((s) => s.name.toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
+
+  /// Convert GuruTugasStudent ke Map untuk halaman tujuan
+  Map<String, dynamic> _studentToMap(GuruTugasStudent student) {
+    return {
+      'student_id': student.studentId,
+      'nis': student.nis,
+      'name': student.name,
+      'class_name': student.className,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,13 +89,156 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
             _buildHeader(),
             _buildSearchFilter(),
             Expanded(
-              child: ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                itemCount: _students.length,
-                itemBuilder: (context, index) {
-                  return _buildStudentCard(_students[index]);
-                },
+              child: _isLoading
+                  ? _buildLoadingState()
+                  : _errorMessage != null
+                      ? _buildErrorState()
+                      : _filteredStudents.isEmpty
+                          ? _buildEmptyState()
+                          : RefreshIndicator(
+                              onRefresh: _loadStudents,
+                              color: AppTheme.primaryGreen,
+                              backgroundColor: AppTheme.white,
+                              child: ListView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(
+                                  parent: BouncingScrollPhysics(),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 8),
+                                itemCount: _filteredStudents.length,
+                                itemBuilder: (context, index) {
+                                  return _buildStudentCard(
+                                      _filteredStudents[index]);
+                                },
+                              ),
+                            ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: AppTheme.primaryGreen,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Memuat daftar siswa...',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.grey400,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 56,
+                color: Colors.red.withOpacity(0.4),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              _errorMessage ?? 'Terjadi kesalahan',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: _loadStudents,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.mainGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Coba Lagi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final isSearching = _searchController.text.isNotEmpty;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isSearching
+                    ? Icons.search_off_rounded
+                    : Icons.people_alt_rounded,
+                size: 56,
+                color: AppTheme.primaryGreen.withOpacity(0.4),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              isSearching ? 'Siswa Tidak Ditemukan' : 'Belum Ada Siswa',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isSearching
+                  ? 'Tidak ada siswa yang cocok dengan pencarian'
+                  : 'Belum ada siswa yang terdaftar di kelas Anda',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.grey400,
+                height: 1.5,
               ),
             ),
           ],
@@ -116,8 +316,9 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                   const Icon(Icons.search_rounded,
                       color: AppTheme.grey400, size: 20),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: TextField(
+                      controller: _searchController,
                       decoration: InputDecoration(
                         hintText: 'Cari nama siswa...',
                         hintStyle: TextStyle(
@@ -150,7 +351,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
     );
   }
 
-  Widget _buildStudentCard(Map<String, dynamic> student) {
+  Widget _buildStudentCard(GuruTugasStudent student) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -176,7 +377,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
               ),
               child: Center(
                 child: Text(
-                  student['name'][0],
+                  student.name.isNotEmpty ? student.name[0] : '?',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -187,13 +388,29 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(
-                student['name'],
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    student.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  if (student.className.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      student.className,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.grey400,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             const Icon(Icons.chevron_right_rounded, color: AppTheme.grey400),
@@ -203,7 +420,8 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
     );
   }
 
-  void _showActionBottomSheet(Map<String, dynamic> student) {
+  void _showActionBottomSheet(GuruTugasStudent student) {
+    final studentMap = _studentToMap(student);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -238,7 +456,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                 ),
                 child: Center(
                   child: Text(
-                    student['name'][0],
+                    student.name.isNotEmpty ? student.name[0] : '?',
                     style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
@@ -249,7 +467,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
               ),
               const SizedBox(height: 16),
               Text(
-                student['name'],
+                student.name,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -257,6 +475,18 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                 ),
                 textAlign: TextAlign.center,
               ),
+              if (student.className.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  student.className,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.grey400,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 32),
               // Buttons
               Row(
@@ -283,7 +513,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => GuruKelasTahfidzReportPage(studentData: student),
+                            builder: (_) => GuruKelasTahfidzReportPage(studentData: studentMap),
                           ),
                         );
                       },
@@ -336,7 +566,8 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
     );
   }
 
-  void _showTugasBottomSheet(Map<String, dynamic> student) {
+  void _showTugasBottomSheet(GuruTugasStudent student) {
+    final studentMap = _studentToMap(student);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -379,7 +610,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => GuruTugasReportPage(
-                        studentData: student,
+                        studentData: studentMap,
                         subjectName: 'Diskusi Keislaman dan Kebangsaan',
                       ),
                     ),
@@ -397,7 +628,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => GuruTugasReportPage(
-                        studentData: student,
+                        studentData: studentMap,
                         subjectName: 'Public Speaking',
                       ),
                     ),

@@ -54,6 +54,41 @@ int? findSurahNumber(String name) {
 }
 
 // ═══════════════════════════════════════
+// Model: Kelas
+// ═══════════════════════════════════════
+class TahfidzClass {
+  final int id;
+  final String name;
+  final String academicYear;
+  final int studentCount;
+
+  TahfidzClass({
+    required this.id,
+    required this.name,
+    this.academicYear = '',
+    this.studentCount = 0,
+  });
+
+  factory TahfidzClass.fromJson(Map<String, dynamic> json) {
+    return TahfidzClass(
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      name: json['name'] as String? ?? '',
+      academicYear: json['academic_year'] as String? ?? '',
+      studentCount: json['student_count'] is int
+          ? json['student_count']
+          : int.tryParse(json['student_count']?.toString() ?? '0') ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'academic_year': academicYear,
+        'student_count': studentCount,
+      };
+}
+
+// ═══════════════════════════════════════
 // Model: Siswa
 // ═══════════════════════════════════════
 class TahfidzStudent {
@@ -166,9 +201,81 @@ class TahfidzSetoran {
 // ═══════════════════════════════════════
 class TahfidzService {
   static const String _baseUrl = 'https://portal-smalka.com/api';
+  static const String _classesCacheKey = 'tahfidz_classes';
+  static const String _classStudentsCachePrefix = 'tahfidz_class_students_';
   static const String _studentsCacheKey = 'tahfidz_students';
   static const String _reportsCachePrefix = 'tahfidz_reports_';
   static const String _mySetoranCacheKey = 'tahfidz_my_setoran';
+
+  // ── GET: Daftar kelas (guru_tahfidz) ──
+  static Future<List<TahfidzClass>> getClasses() async {
+    try {
+      final token = await AuthService.getToken();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/tahfidz.php?action=classes'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      debugPrint('Tahfidz classes: status=${response.statusCode} body=${response.body}');
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List<dynamic> dataList = body['data'] ?? [];
+        final classes = dataList.map((e) => TahfidzClass.fromJson(e)).toList();
+        await _saveClassesToCache(classes);
+        return classes;
+      }
+      final msg = body['message'] ?? 'Gagal mengambil data kelas (${response.statusCode})';
+      throw Exception(msg);
+    } on TimeoutException {
+      debugPrint('Tahfidz: timeout classes, pakai cache');
+      return _getClassesFromCache();
+    } catch (e) {
+      debugPrint('Tahfidz: gagal fetch classes ($e)');
+      final cached = await _getClassesFromCache();
+      if (cached.isNotEmpty) return cached;
+      rethrow;
+    }
+  }
+
+  // ── GET: Daftar siswa per kelas (guru_tahfidz) ──
+  static Future<List<TahfidzStudent>> getStudentsByClass({
+    required int classId,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/tahfidz.php?action=class_students&class_id=$classId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      debugPrint('Tahfidz class_students: status=${response.statusCode} body=${response.body}');
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List<dynamic> dataList = body['data'] ?? [];
+        final students = dataList.map((e) => TahfidzStudent.fromJson(e)).toList();
+        await _saveClassStudentsToCache(classId, students);
+        return students;
+      }
+      final msg = body['message'] ?? 'Gagal mengambil data siswa (${response.statusCode})';
+      throw Exception(msg);
+    } on TimeoutException {
+      debugPrint('Tahfidz: timeout class_students, pakai cache');
+      return _getClassStudentsFromCache(classId);
+    } catch (e) {
+      debugPrint('Tahfidz: gagal fetch class_students ($e)');
+      final cached = await _getClassStudentsFromCache(classId);
+      if (cached.isNotEmpty) return cached;
+      rethrow;
+    }
+  }
 
   // ── GET: Daftar siswa (guru) ──
   static Future<List<TahfidzStudent>> getStudents() async {
@@ -366,6 +473,55 @@ class TahfidzService {
     } catch (e) {
       debugPrint('Tahfidz deleteSetoran gagal: $e');
       rethrow;
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // Cache helpers – Classes
+  // ═══════════════════════════════════════
+  static Future<void> _saveClassesToCache(List<TahfidzClass> classes) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = classes.map((c) => c.toJson()).toList();
+      await prefs.setString(_classesCacheKey, jsonEncode(jsonList));
+    } catch (_) {}
+  }
+
+  static Future<List<TahfidzClass>> _getClassesFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_classesCacheKey);
+      if (raw == null) return [];
+      final List<dynamic> list = jsonDecode(raw);
+      return list.map((e) => TahfidzClass.fromJson(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // Cache helpers – Class Students (per class)
+  // ═══════════════════════════════════════
+  static Future<void> _saveClassStudentsToCache(
+      int classId, List<TahfidzStudent> students) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = students.map((s) => s.toJson()).toList();
+      await prefs.setString(
+          '$_classStudentsCachePrefix$classId', jsonEncode(jsonList));
+    } catch (_) {}
+  }
+
+  static Future<List<TahfidzStudent>> _getClassStudentsFromCache(
+      int classId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_classStudentsCachePrefix$classId');
+      if (raw == null) return [];
+      final List<dynamic> list = jsonDecode(raw);
+      return list.map((e) => TahfidzStudent.fromJson(e)).toList();
+    } catch (_) {
+      return [];
     }
   }
 

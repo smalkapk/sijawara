@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import 'home_page.dart';
 import 'wali_home_page.dart';
 import 'guru_home_page.dart';
+import 'guru_tahfidz_home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -91,8 +92,10 @@ class _LoginPageState extends State<LoginPage>
         destination = const HomePage();
       } else if (role == 'orang_tua') {
         destination = const WaliHomePage();
+      } else if (role == 'guru_tahfidz') {
+        destination = const GuruTahfidzHomePage();
       } else {
-        // guru_tahfidz atau guru_kelas
+        // guru_kelas
         destination = const GuruHomePage();
       }
 
