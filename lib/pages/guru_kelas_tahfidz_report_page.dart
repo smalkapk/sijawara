@@ -327,14 +327,101 @@ class _GuruKelasTahfidzReportPageState
               ],
             ),
             const SizedBox(height: 20),
-            _buildReportItem('Surah', report.surahName),
+            // Multi-surah: show each item with per-surah grade
+            if (report.isMultiSurah) ...[
+              _buildReportItem('Surah', ''),
+              ...report.items.map((item) {
+                final gColor = _gradeColor(item.grade);
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryGreen,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${item.surahName} — Ayat ${item.ayatFrom}-${item.ayatTo}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: gColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          item.grade,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: gColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ] else ...[
+              _buildReportItem('Surah', report.surahName),
+              _buildDivider(),
+              _buildReportItem('Ayat', report.ayatRange),
+            ],
             _buildDivider(),
-            _buildReportItem('Ayat', report.ayatRange),
-            _buildDivider(),
-            _buildReportItem(
-              'Predikat Nilai',
-              '${report.grade} (${report.gradeLabel})',
-            ),
+            if (report.isMultiSurah) ...[
+              _buildReportItem('Predikat Nilai', ''),
+              ...report.items.map((item) {
+                final gColor = _gradeColor(item.grade);
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: gColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          item.grade,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: gColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        item.surahName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ] else
+              _buildReportItem(
+                'Predikat Nilai',
+                report.grade,
+              ),
             _buildDivider(),
             _buildReportItem(
               'Catatan Guru',
@@ -383,6 +470,17 @@ class _GuruKelasTahfidzReportPageState
     );
   }
 
+  Color _gradeColor(String grade) {
+    switch (grade) {
+      case 'A':  return const Color(0xFF7C3AED);
+      case 'B+': return const Color(0xFF3B82F6);
+      case 'B':  return const Color(0xFF059669);
+      case 'C':  return const Color(0xFFF59E0B);
+      case 'D':  return const Color(0xFFEF4444);
+      default:   return AppTheme.grey400;
+    }
+  }
+
   Widget _buildBottomActions(BuildContext context) {
     final hasSelection =
         _selectedReportIndex != null && _selectedReportIndex! < _reports.length;
@@ -416,6 +514,7 @@ class _GuruKelasTahfidzReportPageState
                   if (hasSelection) {
                     final sel = _reports[_selectedReportIndex!];
                     formData['id'] = sel.id;
+                    formData['group_id'] = sel.groupId;
                     formData['surah_number'] = sel.surahNumber;
                     formData['last_surah'] = sel.surahName;
                     formData['ayat'] = sel.ayatRange;
@@ -423,6 +522,8 @@ class _GuruKelasTahfidzReportPageState
                     formData['ayat_to'] = sel.ayatTo;
                     formData['grade'] = sel.grade;
                     formData['note'] = sel.notes;
+                    // Pass items list for multi-surah editing
+                    formData['items'] = sel.items.map((i) => i.toJson()).toList();
                     editing = true;
                   }
 

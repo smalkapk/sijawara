@@ -86,6 +86,137 @@ void showPrayerTrackingSheet(
   );
 }
 
+/// Tampilkan bottom sheet blokir saat user mencoba klik tanggal di masa depan.
+void showFutureDateBlockedSheet(BuildContext context, DateTime date) {
+  HapticFeedback.heavyImpact();
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _FutureDateBlockedSheet(date: date),
+  );
+}
+
+/// ─── Bottom Sheet: Tanggal Masa Depan ─────────────────────────────────────
+class _FutureDateBlockedSheet extends StatelessWidget {
+  final DateTime date;
+  const _FutureDateBlockedSheet({required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.grey200,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+
+          // Main Message
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                // Emoji illustration
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppTheme.grey100,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppTheme.grey200,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '🤔',
+                      style: TextStyle(fontSize: 32),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Yakin besok kamu masih idup?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                    letterSpacing: -0.5,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Sub message
+                Text(
+                  'Kamu tidak diperkenankan merekap\nkegiatan ibadah pada waktu kedepannya,\numur ga ada yang tau.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: AppTheme.grey600,
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Close button
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.mainGradient,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: AppTheme.greenGlow,
+                    ),
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: AppTheme.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Oke, aku paham 🙏',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ───── Main Widget ─────
 class PrayerCountdown extends StatefulWidget {
   final ValueChanged<int>? onPointsEarned;

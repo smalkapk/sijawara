@@ -275,10 +275,12 @@ class _WaliHomePageState extends State<WaliHomePage>
 
                               const SizedBox(height: 4),
 
-                              // Guru Input / Teacher Assessment
+                              // Berita Sekolah
                               WaliGuruInput(
                                 refreshKey: ValueKey(_beritaRefreshKey),
                               ),
+
+                              const SizedBox(height: 4),
 
                               const SizedBox(height: 120),
                             ],

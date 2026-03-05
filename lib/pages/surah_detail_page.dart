@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../theme.dart';
 import '../services/quran_reading_service.dart';
+import '../widgets/skeleton_loader.dart';
 
 // ── Ayat Model ──
 class Ayat {
@@ -123,6 +125,21 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
 
   // ── Fetch from Al-Quran Cloud API (Uthmani + Indonesian + Transliteration) ──
   Future<SurahDetail> _fetchSurah(int number) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cacheKey = 'surah_cache_$number';
+
+    // 1. Try to load from cache
+    final cachedData = prefs.getString(cacheKey);
+    if (cachedData != null) {
+      try {
+        final body = jsonDecode(cachedData) as Map<String, dynamic>;
+        return _parseSurahData(number, body);
+      } catch (e) {
+        // Obsolete or corrupted cache, fall through to fetch from API
+      }
+    }
+
+    // 2. If not in cache, fetch from API
     final url = Uri.parse(
       'https://api.alquran.cloud/v1/surah/$number/editions/quran-uthmani,en.transliteration,id.indonesian',
     );
@@ -132,7 +149,14 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
       throw Exception('Gagal memuat surat (${response.statusCode})');
     }
 
+    // 3. Save to cache before parsing
+    await prefs.setString(cacheKey, response.body);
+
     final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return _parseSurahData(number, body);
+  }
+
+  SurahDetail _parseSurahData(int number, Map<String, dynamic> body) {
     if (body['code'] != 200) {
       throw Exception('API error: ${body['status']}');
     }
@@ -155,9 +179,20 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
     // Combine all editions into unified Ayat list
     final List<Ayat> ayatList = [];
     for (int i = 0; i < uthmaniAyahs.length; i++) {
+      String arabText = uthmaniAyahs[i]['text'] as String;
+
+      // Remove Bismillah from the beginning of the first ayat for all surahs except Al-Fatihah (1) and At-Taubah (9)
+      if (number != 1 && number != 9 && i == 0) {
+        if (arabText.startsWith('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ')) {
+          arabText = arabText.replaceFirst('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ', '').trim();
+        } else if (arabText.startsWith('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ')) {
+          arabText = arabText.replaceFirst('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ', '').trim();
+        }
+      }
+
       ayatList.add(Ayat(
         nomorAyat: uthmaniAyahs[i]['numberInSurah'] as int,
-        teksArab: uthmaniAyahs[i]['text'] as String,
+        teksArab: arabText,
         teksLatin: translitAyahs[i]['text'] as String,
         teksIndonesia: indonesianAyahs[i]['text'] as String,
       ));
@@ -296,27 +331,88 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
 
   // ── Loading ──
   Widget _buildLoading() {
-    return Center(
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 40),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return _buildHeaderSkeleton();
+        }
+        return _buildAyatSkeleton();
+      },
+    );
+  }
+
+  Widget _buildHeaderSkeleton() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.grey100),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              color: AppTheme.primaryGreen,
-            ),
+          const SkeletonLoader(height: 40, width: 150),
+          const SizedBox(height: 6),
+          const SkeletonLoader(height: 20, width: 100),
+          const SizedBox(height: 4),
+          const SkeletonLoader(height: 16, width: 200),
+          const SizedBox(height: 14),
+          Container(height: 1, color: AppTheme.grey100),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SkeletonLoader(height: 30, width: 80, borderRadius: BorderRadius.circular(10)),
+              const SizedBox(width: 16),
+              SkeletonLoader(height: 30, width: 80, borderRadius: BorderRadius.circular(10)),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const SkeletonLoader(height: 30, width: 200),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAyatSkeleton() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: const BoxDecoration(
+        color: AppTheme.white,
+        border: Border(bottom: BorderSide(color: AppTheme.grey100, width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SkeletonLoader(height: 32, width: 32, borderRadius: BorderRadius.circular(10)),
+              const Spacer(),
+              SkeletonLoader(height: 24, width: 24, borderRadius: BorderRadius.circular(12)),
+            ],
           ),
           const SizedBox(height: 16),
-          Text(
-            'Memuat ${widget.surahName}...',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.grey400,
-              fontWeight: FontWeight.w500,
-            ),
+          const Align(
+            alignment: Alignment.centerRight,
+            child: SkeletonLoader(height: 32, width: 250),
           ),
+          const SizedBox(height: 8),
+          const Align(
+            alignment: Alignment.centerRight,
+            child: SkeletonLoader(height: 32, width: 200),
+          ),
+          const SizedBox(height: 20),
+          const SkeletonLoader(height: 16, width: double.infinity),
+          const SizedBox(height: 8),
+          const SkeletonLoader(height: 16, width: 200),
+          const SizedBox(height: 12),
+          const SkeletonLoader(height: 14, width: double.infinity),
+          const SizedBox(height: 6),
+          const SkeletonLoader(height: 14, width: 250),
         ],
       ),
     );

@@ -1,0 +1,14 @@
+# =====================================================
+# .htaccess – Sijawara Server (public_html)
+# =====================================================
+
+# Pass Authorization header ke PHP (wajib di cPanel CGI/FastCGI/LiteSpeed)
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+# PHP upload limits untuk chat attachments
+php_value upload_max_filesize 25M
+php_value post_max_size 30M
+php_value max_execution_time 120
+php_value memory_limit 256M

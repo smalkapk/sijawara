@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../theme.dart';
+import '../services/chat_service.dart';
 import 'guru_chat_page.dart';
 
+/// Halaman daftar kontak wali murid (untuk Guru Kelas)
+/// UI mirip WhatsApp: list chat ke bawah, dengan search
 class GuruDiskusiWaliPage extends StatefulWidget {
   const GuruDiskusiWaliPage({super.key});
 
@@ -15,68 +20,90 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
 
-  // Dummy data for chat list
-  final List<Map<String, dynamic>> _chatData = [
-    {
-      'wali_name': 'Bapak Budi (Wali Ahmad)',
-      'initials': 'BB',
-      'last_message': 'Terima kasih informasinya, Pak.',
-      'time': '10:30',
-      'unread': 0,
-      'is_online': false,
-      'is_me_last': false,
-    },
-    {
-      'wali_name': 'Ibu Siti (Wali Aisyah)',
-      'initials': 'IS',
-      'last_message': 'Assalamu\'alaikum, apakah besok ada PR?',
-      'time': '09:15',
-      'unread': 2,
-      'is_online': true,
-      'is_me_last': false,
-    },
-    {
-      'wali_name': 'Bapak Joko (Wali Dimas)',
-      'initials': 'BJ',
-      'last_message': 'Baik Bu, terima kasih atas informasinya.',
-      'time': 'Kemarin',
-      'unread': 0,
-      'is_online': false,
-      'is_me_last': true,
-    },
-    {
-      'wali_name': 'Ibu Ani (Wali Farah)',
-      'initials': 'IA',
-      'last_message': 'Alhamdulillah nilainya bagus. Mohon bimbingannya terus.',
-      'time': 'Kemarin',
-      'unread': 0,
-      'is_online': false,
-      'is_me_last': false,
-    },
-    {
-      'wali_name': 'Bapak Rudi (Wali Hana)',
-      'initials': 'BR',
-      'last_message': 'Anak saya hari ini tidak masuk ya Pak.',
-      'time': '22/02/26',
-      'unread': 0,
-      'is_online': false,
-      'is_me_last': false,
-    },
-  ];
+  List<WaliContact> _contacts = [];
+  bool _isLoading = true;
 
-  List<Map<String, dynamic>> get _filteredChats {
+  // WebSocket untuk update real-time
+  ChatWebSocket? _ws;
+  StreamSubscription<Map<String, dynamic>>? _wsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      await _loadContacts();
+      _connectWebSocket();
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Gagal init guru diskusi: $e');
+    }
+  }
+
+  Future<void> _loadContacts() async {
+    try {
+      setState(() => _isLoading = true);
+      final contacts = await ChatService.getContacts();
+      if (!mounted) return;
+      setState(() {
+        _contacts = contacts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      debugPrint('Gagal load kontak: $e');
+    }
+  }
+
+  void _connectWebSocket() {
+    _ws = ChatWebSocket();
+    _wsSub = _ws!.messageStream.listen(_handleWsMessage);
+    _ws!.connect();
+  }
+
+  void _handleWsMessage(Map<String, dynamic> data) {
+    final type = data['type'] as String?;
+    if (type == 'new_message') {
+      // Refresh daftar kontak untuk update last_message & unread
+      _loadContacts();
+    }
+  }
+
+  List<WaliContact> get _filteredContacts {
     final query = _searchController.text.toLowerCase();
-    if (query.isEmpty) return _chatData;
-    return _chatData.where((chat) {
-      return (chat['wali_name'] as String).toLowerCase().contains(query) ||
-          (chat['last_message'] as String).toLowerCase().contains(query);
+    if (query.isEmpty) return _contacts;
+    return _contacts.where((c) {
+      return c.waliName.toLowerCase().contains(query) ||
+          c.childrenNames.toLowerCase().contains(query) ||
+          (c.lastMessage?.toLowerCase().contains(query) ?? false);
     }).toList();
+  }
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final msgDate = DateTime(dt.year, dt.month, dt.day);
+
+    if (msgDate == today) {
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+    if (msgDate == today.subtract(const Duration(days: 1))) {
+      return 'Kemarin';
+    }
+    return DateFormat('dd/MM/yy').format(dt);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocus.dispose();
+    _wsSub?.cancel();
+    _ws?.dispose();
     super.dispose();
   }
 
@@ -88,26 +115,27 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
         children: [
           _buildAppBar(),
           Expanded(
-            child: _filteredChats.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.zero,
-                    itemCount: _filteredChats.length,
-                    itemBuilder: (context, index) {
-                      return _buildChatListItem(_filteredChats[index], index);
-                    },
-                  ),
+            child: _isLoading
+                ? _buildLoadingState()
+                : _filteredContacts.isEmpty
+                    ? _buildEmptyState()
+                    : RefreshIndicator(
+                        onRefresh: _loadContacts,
+                        color: AppTheme.primaryGreen,
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          padding: EdgeInsets.zero,
+                          itemCount: _filteredContacts.length,
+                          itemBuilder: (context, index) {
+                            return _buildChatListItem(
+                                _filteredContacts[index], index);
+                          },
+                        ),
+                      ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          HapticFeedback.lightImpact();
-        },
-        backgroundColor: AppTheme.primaryGreen,
-        elevation: 4,
-        child: const Icon(Icons.chat_rounded, color: Colors.white),
       ),
     );
   }
@@ -187,16 +215,15 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
         IconButton(
           icon: const Icon(Icons.search_rounded, color: AppTheme.textSecondary),
           onPressed: () {
-            setState(() {
-              _isSearching = true;
-            });
+            setState(() => _isSearching = true);
             Future.delayed(const Duration(milliseconds: 100), () {
               _searchFocus.requestFocus();
             });
           },
         ),
         IconButton(
-          icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textSecondary),
+          icon:
+              const Icon(Icons.more_vert_rounded, color: AppTheme.textSecondary),
           onPressed: () {},
         ),
       ],
@@ -245,7 +272,8 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.search_rounded, color: AppTheme.grey400, size: 20),
+                const Icon(Icons.search_rounded,
+                    color: AppTheme.grey400, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -264,7 +292,8 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                       ),
                       border: InputBorder.none,
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 10),
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
@@ -275,7 +304,8 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                       _searchController.clear();
                       setState(() {});
                     },
-                    child: const Icon(Icons.close_rounded, color: AppTheme.grey400, size: 18),
+                    child: const Icon(Icons.close_rounded,
+                        color: AppTheme.grey400, size: 18),
                   ),
               ],
             ),
@@ -285,20 +315,26 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildLoadingState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline_rounded,
-              size: 64, color: AppTheme.grey400.withOpacity(0.5)),
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: AppTheme.primaryGreen,
+            ),
+          ),
           const SizedBox(height: 16),
           Text(
-            'Tidak ada percakapan',
+            'Memuat daftar wali...',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               color: AppTheme.grey400,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -306,56 +342,75 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
     );
   }
 
-  Widget _buildChatListItem(Map<String, dynamic> chat, int index) {
-    final unreadCount = chat['unread'] as int;
-    final isOnline = chat['is_online'] as bool;
-    final isMeLast = chat['is_me_last'] as bool;
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.chat_bubble_outline_rounded,
+              size: 64, color: AppTheme.grey400.withValues(alpha: 0.5)),
+          const SizedBox(height: 16),
+          Text(
+            _searchController.text.isNotEmpty
+                ? 'Tidak ditemukan'
+                : 'Belum ada wali murid',
+            style: TextStyle(
+              fontSize: 16,
+              color: AppTheme.grey400,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (_searchController.text.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Wali murid dari kelas Anda\nakan muncul di sini',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.grey400,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
+  Widget _buildChatListItem(WaliContact contact, int index) {
     return InkWell(
-      onTap: () {
+      onTap: () async {
         HapticFeedback.lightImpact();
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => GuruChatPage(waliName: chat['wali_name']),
+            builder: (_) => GuruChatPage(
+              waliId: contact.waliId,
+              waliName: contact.waliName,
+              childrenNames: contact.childrenNames,
+            ),
           ),
         );
+        // Refresh setelah kembali dari chat
+        _loadContacts();
       },
       child: Container(
         color: AppTheme.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            // Avatar with online indicator
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: _getAvatarColor(index),
-                  child: Text(
-                    chat['initials'],
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
+            // Avatar
+            CircleAvatar(
+              radius: 26,
+              backgroundColor: _getAvatarColor(index),
+              child: Text(
+                contact.initials,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
-                if (isOnline)
-                  Positioned(
-                    bottom: 1,
-                    right: 1,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF25D366),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
             const SizedBox(width: 14),
 
@@ -367,80 +422,98 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          chat['wali_name'],
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight:
-                                unreadCount > 0 ? FontWeight.w800 : FontWeight.w600,
-                            color: AppTheme.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              contact.waliName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: contact.unreadCount > 0
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (contact.childrenNames.isNotEmpty)
+                              Text(
+                                'Wali dari ${contact.childrenNames}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.primaryGreen,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        chat['time'],
+                        _formatTime(contact.lastMessageTime),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: unreadCount > 0
+                          color: contact.unreadCount > 0
                               ? const Color(0xFF25D366)
                               : AppTheme.grey400,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      // Double check icon for sent messages
-                      if (isMeLast) ...[
-                        Icon(
-                          Icons.done_all_rounded,
-                          size: 18,
-                          color: const Color(0xFF53BDEB),
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                      Expanded(
-                        child: Text(
-                          chat['last_message'],
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: unreadCount > 0
-                                ? AppTheme.textPrimary
-                                : AppTheme.grey400,
-                            fontWeight: unreadCount > 0
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            height: 1.3,
+                  if (contact.lastMessage != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (contact.lastMessageIsMe) ...[
+                          Icon(
+                            Icons.done_all_rounded,
+                            size: 18,
+                            color: const Color(0xFF53BDEB),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (unreadCount > 0)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF25D366),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Expanded(
                           child: Text(
-                            unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                            contact.lastMessage!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: contact.unreadCount > 0
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.grey400,
+                              fontWeight: contact.unreadCount > 0
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              height: 1.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (contact.unreadCount > 0)
+                          Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF25D366),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              contact.unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

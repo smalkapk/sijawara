@@ -1,9 +1,11 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
 import '../services/profile_service.dart';
+import '../services/page_cache.dart';
 import 'login_page.dart';
 import 'settings/edit_profile_page.dart';
 import 'settings/change_password_page.dart';
@@ -19,10 +21,12 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late AnimationController _pointsAnimController;
   late Animation<double> _pointsAnimation;
   late TabController _tabController;
+  late AnimationController _shimmerController;
+  late Animation<double> _shimmerAnimation;
 
   // ── State ──
   bool _isLoading = true;
@@ -41,6 +45,11 @@ class _ProfilePageState extends State<ProfilePage>
 
   List<int> _weeklyPoints = [0, 0, 0, 0, 0, 0, 0];
   List<String> _dayLabels = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+  
+  bool _isMonthlyView = false;
+  final List<String> _monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+  List<int> _monthlyPoints = List.filled(12, 0);
+
   List<PointSource> _pointSources = [];
   List<BadgeInfo> _badges = [];
   List<LeaderboardEntry> _leaderboard = [];
@@ -57,6 +66,15 @@ class _ProfilePageState extends State<ProfilePage>
       parent: _pointsAnimController,
       curve: Curves.easeOutCubic,
     );
+    
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+    
+    _shimmerAnimation = Tween<double>(begin: 0.3, end: 0.7).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
+    );
 
     _loadProfileData();
     _loadLeaderboardData();
@@ -66,10 +84,35 @@ class _ProfilePageState extends State<ProfilePage>
   void dispose() {
     _tabController.dispose();
     _pointsAnimController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
   Future<void> _loadProfileData() async {
+    // Gunakan cache jika masih segar (30 menit)
+    if (PageCache.profileData != null &&
+        PageCache.isFresh(PageCache.profileTimestamp)) {
+      final cached = PageCache.profileData!;
+      if (!mounted) return;
+      setState(() {
+        _studentName = cached.profile.name;
+        _studentClass = cached.profile.className;
+        _schoolName = cached.profile.schoolName;
+        _totalPoints = cached.profile.totalPoints;
+        _currentLevel = cached.profile.currentLevel;
+        _pointsForNextLevel = cached.profile.pointsForNextLevel;
+        _streak = cached.profile.streak;
+        _weeklyPoints = cached.weeklyPoints;
+        _dayLabels = cached.dayLabels;
+        _monthlyPoints = cached.monthlyPoints;
+        _pointSources = cached.pointsBreakdown;
+        _badges = cached.badges;
+        _isLoading = false;
+      });
+      _pointsAnimController.forward();
+      return;
+    }
+
     try {
       setState(() {
         _isLoading = true;
@@ -79,6 +122,11 @@ class _ProfilePageState extends State<ProfilePage>
       final data = await ProfileService.getProfile();
 
       if (!mounted) return;
+
+      // Simpan ke cache
+      PageCache.profileData = data;
+      PageCache.profileTimestamp = DateTime.now();
+
       setState(() {
         _studentName = data.profile.name;
         _studentClass = data.profile.className;
@@ -90,6 +138,7 @@ class _ProfilePageState extends State<ProfilePage>
 
         _weeklyPoints = data.weeklyPoints;
         _dayLabels = data.dayLabels;
+        _monthlyPoints = data.monthlyPoints;
         _pointSources = data.pointsBreakdown;
         _badges = data.badges;
 
@@ -118,6 +167,18 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _loadLeaderboardData() async {
+    // Gunakan cache jika masih segar (30 menit)
+    if (PageCache.leaderboardData != null &&
+        PageCache.isFresh(PageCache.leaderboardTimestamp)) {
+      final cached = PageCache.leaderboardData!;
+      if (!mounted) return;
+      setState(() {
+        _leaderboard = cached.leaderboard;
+        _isLeaderboardLoading = false;
+      });
+      return;
+    }
+
     try {
       setState(() {
         _isLeaderboardLoading = true;
@@ -127,6 +188,11 @@ class _ProfilePageState extends State<ProfilePage>
       final data = await ProfileService.getLeaderboard();
 
       if (!mounted) return;
+
+      // Simpan ke cache
+      PageCache.leaderboardData = data;
+      PageCache.leaderboardTimestamp = DateTime.now();
+
       setState(() {
         _leaderboard = data.leaderboard;
         _isLeaderboardLoading = false;
@@ -144,6 +210,20 @@ class _ProfilePageState extends State<ProfilePage>
         _leaderboardError = 'Terjadi kesalahan: $e';
       });
     }
+  }
+
+  /// Pull-to-refresh: hapus cache profil lalu fetch ulang dari server
+  Future<void> _refreshProfile() async {
+    PageCache.clearProfile();
+    _pointsAnimController.reset();
+    await _loadProfileData();
+  }
+
+  /// Pull-to-refresh leaderboard: hapus cache leaderboard lalu fetch ulang
+  Future<void> _refreshLeaderboard() async {
+    PageCache.leaderboardData = null;
+    PageCache.leaderboardTimestamp = null;
+    await _loadLeaderboardData();
   }
 
   void _showNewBadgeDialog(List<String> badgeNames) {
@@ -231,8 +311,46 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
+  // ── Skeleton UI Helper ──
+  Widget _buildShimmerContainer(double width, double height, {double borderRadius = 12}) {
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, child) {
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: AppTheme.white.withOpacity(_shimmerAnimation.value),
+            borderRadius: BorderRadius.circular(borderRadius),
+          ),
+        );
+      },
+    );
+  }
+  
+  Widget _buildDarkShimmerContainer(double width, double height, {double borderRadius = 12}) {
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, child) {
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: AppTheme.grey200.withOpacity(_shimmerAnimation.value),
+            borderRadius: BorderRadius.circular(borderRadius),
+          ),
+        );
+      },
+    );
+  }
+
+  // Pertahankan state agar tidak di-dispose saat scroll horizontal PageView
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context); // diperlukan oleh AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppTheme.bgColor,
       body: SafeArea(
@@ -382,10 +500,19 @@ class _ProfilePageState extends State<ProfilePage>
   // ── Pribadi Tab ──
   Widget _buildPribadiTab() {
     if (_isLoading) {
-      return const Center(
+      return SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
         child: Padding(
-          padding: EdgeInsets.only(top: 80),
-          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            children: [
+              _buildDarkShimmerContainer(double.infinity, 90, borderRadius: 24),
+              const SizedBox(height: 16),
+              _buildDarkShimmerContainer(double.infinity, 200, borderRadius: 24),
+              const SizedBox(height: 16),
+              _buildDarkShimmerContainer(double.infinity, 250, borderRadius: 24),
+            ],
+          ),
         ),
       );
     }
@@ -396,7 +523,7 @@ class _ProfilePageState extends State<ProfilePage>
 
     return RefreshIndicator(
       color: AppTheme.primaryGreen,
-      onRefresh: _loadProfileData,
+      onRefresh: _refreshProfile,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
@@ -406,12 +533,8 @@ class _ProfilePageState extends State<ProfilePage>
             const SizedBox(height: 16),
             _buildPointsCard(),
             const SizedBox(height: 16),
-            _buildWeeklyChart(),
+            _buildPointsChart(),
             const SizedBox(height: 16),
-            if (_pointSources.isNotEmpty) ...[
-              _buildPointsBreakdown(),
-              const SizedBox(height: 16),
-            ],
             _buildSettingsSection(),
             const SizedBox(height: 120),
           ],
@@ -423,10 +546,38 @@ class _ProfilePageState extends State<ProfilePage>
   // ── Badges Tab ──
   Widget _buildBadgesTab() {
     if (_isLoading) {
-      return const Center(
+      return SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
         child: Padding(
-          padding: EdgeInsets.only(top: 80),
-          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildDarkShimmerContainer(120, 24),
+                  const Spacer(),
+                  _buildDarkShimmerContainer(40, 20),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildDarkShimmerContainer(double.infinity, 100, borderRadius: 16)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _buildDarkShimmerContainer(double.infinity, 100, borderRadius: 16)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: _buildDarkShimmerContainer(double.infinity, 100, borderRadius: 16)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _buildDarkShimmerContainer(double.infinity, 100, borderRadius: 16)),
+                ],
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -437,7 +588,7 @@ class _ProfilePageState extends State<ProfilePage>
 
     return RefreshIndicator(
       color: AppTheme.primaryGreen,
-      onRefresh: _loadProfileData,
+      onRefresh: _refreshProfile,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
@@ -456,10 +607,27 @@ class _ProfilePageState extends State<ProfilePage>
   // ── Leaderboard Tab ──
   Widget _buildLeaderboardTab() {
     if (_isLeaderboardLoading) {
-      return const Center(
+      return SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
         child: Padding(
-          padding: EdgeInsets.only(top: 80),
-          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildDarkShimmerContainer(80, 120, borderRadius: 16),
+                  const SizedBox(width: 10),
+                  _buildDarkShimmerContainer(90, 150, borderRadius: 16),
+                  const SizedBox(width: 10),
+                  _buildDarkShimmerContainer(80, 100, borderRadius: 16),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _buildDarkShimmerContainer(double.infinity, 300, borderRadius: 24),
+            ],
+          ),
         ),
       );
     }
@@ -494,7 +662,7 @@ class _ProfilePageState extends State<ProfilePage>
 
     return RefreshIndicator(
       color: AppTheme.primaryGreen,
-      onRefresh: _loadLeaderboardData,
+      onRefresh: _refreshLeaderboard,
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
@@ -934,11 +1102,25 @@ class _ProfilePageState extends State<ProfilePage>
           boxShadow: AppTheme.greenGlow,
         ),
         child: _isLoading
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(color: AppTheme.white),
-                ),
+            ? Row(
+                children: [
+                  _buildShimmerContainer(64, 64, borderRadius: 20),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildShimmerContainer(150, 20),
+                        const SizedBox(height: 8),
+                        _buildShimmerContainer(100, 14),
+                        const SizedBox(height: 6),
+                        _buildShimmerContainer(180, 12),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildShimmerContainer(50, 60, borderRadius: 12),
+                ],
               )
             : Row(
                 children: [
@@ -995,49 +1177,6 @@ class _ProfilePageState extends State<ProfilePage>
                             color: AppTheme.white.withOpacity(0.85),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _schoolName,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w400,
-                            color: AppTheme.white.withOpacity(0.65),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Streak badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.local_fire_department_rounded,
-                          color: AppTheme.softGold,
-                          size: 20,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$_streak',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.white,
-                          ),
-                        ),
-                        Text(
-                          'hari',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.white.withOpacity(0.7),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -1088,7 +1227,7 @@ class _ProfilePageState extends State<ProfilePage>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Total Poin Ibadah',
+                          'Level Kamu',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
@@ -1100,7 +1239,7 @@ class _ProfilePageState extends State<ProfilePage>
                           animation: _pointsAnimation,
                           builder: (context, child) {
                             return Text(
-                              '${(_totalPoints * _pointsAnimation.value).toInt()}',
+                              '${(_currentLevel * _pointsAnimation.value).toInt()}',
                               style: const TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w900,
@@ -1115,34 +1254,7 @@ class _ProfilePageState extends State<ProfilePage>
                   ],
                 ),
                 // Level Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.mainGradient,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primaryGreen.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.shield_rounded, color: AppTheme.softGold, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Lv.$_currentLevel',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              // Container Badge dihapus
               ],
             ),
             const SizedBox(height: 20),
@@ -1204,273 +1316,191 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  // ── Weekly Chart ──
-  Widget _buildWeeklyChart() {
-    final maxVal = _weeklyPoints.isEmpty
+  // ── Points Chart ──
+  Widget _buildPointsChart() {
+    final isMonthly = _isMonthlyView;
+    final labels = isMonthly ? _monthLabels : _dayLabels;
+    final data = isMonthly ? _monthlyPoints : _weeklyPoints;
+    
+    final maxVal = data.isEmpty
         ? 1.0
-        : _weeklyPoints.reduce((a, b) => a > b ? a : b).toDouble();
+        : data.reduce((a, b) => a > b ? a : b).toDouble();
     final effectiveMax = maxVal > 0 ? maxVal : 1.0;
+    
+    final title = isMonthly ? 'Poin Bulanan' : 'Poin Mingguan';
+    final subtitle = isMonthly ? 'Perolehan poin Januari - Desember' : 'Perolehan poin 7 hari terakhir';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppTheme.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: AppTheme.softShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          setState(() {
+            _isMonthlyView = !_isMonthlyView;
+          });
+        },
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 600),
+          transitionBuilder: (child, animation) {
+            return AnimatedBuilder(
+              animation: animation,
+              builder: (context, childWidget) {
+                final blurValue = (1.0 - animation.value) * 10.0;
+                return ImageFiltered(
+                  imageFilter: ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
+                  child: Opacity(
+                    opacity: animation.value,
+                    child: childWidget,
+                  ),
+                );
+              },
+              child: child,
+            );
+          },
+          child: Container(
+            key: ValueKey<bool>(_isMonthlyView),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: AppTheme.softShadow,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.cardGradient1,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.bar_chart_rounded,
-                    color: AppTheme.white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Poin Mingguan',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      'Perolehan poin 7 hari terakhir',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                        color: AppTheme.grey400,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 130,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: List.generate(
-                  min(7, _weeklyPoints.length),
-                  (index) {
-                    final value = _weeklyPoints[index];
-                    final heightFraction = value / effectiveMax;
-                    final isToday = index == _weeklyPoints.length - 1;
-
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              '+$value',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: isToday
-                                    ? AppTheme.primaryGreen
-                                    : AppTheme.grey400,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            AnimatedBuilder(
-                              animation: _pointsAnimation,
-                              builder: (context, child) {
-                                return Container(
-                                  height: (90 * heightFraction * _pointsAnimation.value)
-                                      .clamp(4.0, 90.0),
-                                  decoration: BoxDecoration(
-                                    gradient: isToday
-                                        ? AppTheme.mainGradient
-                                        : LinearGradient(
-                                            colors: [
-                                              AppTheme.emerald.withOpacity(0.4),
-                                              AppTheme.emerald.withOpacity(0.2),
-                                            ],
-                                            begin: Alignment.bottomCenter,
-                                            end: Alignment.topCenter,
-                                          ),
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: isToday
-                                        ? [
-                                            BoxShadow(
-                                              color: AppTheme.primaryGreen
-                                                  .withOpacity(0.3),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              index < _dayLabels.length
-                                  ? _dayLabels[index]
-                                  : '',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: isToday
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: isToday
-                                    ? AppTheme.primaryGreen
-                                    : AppTheme.grey400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Points Breakdown ──
-  Widget _buildPointsBreakdown() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppTheme.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: AppTheme.softShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.sunsetGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.pie_chart_rounded,
-                    color: AppTheme.white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Rincian Poin',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      'Sumber perolehan poin ibadah',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                        color: AppTheme.grey400,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ..._pointSources.map((source) {
-              final fraction = _totalPoints > 0
-                  ? source.points / _totalPoints
-                  : 0.0;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
+                Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: source.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        gradient: isMonthly ? AppTheme.cardGradient2 : AppTheme.cardGradient1,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(source.icon, color: source.color, size: 16),
+                      child: Icon(
+                        isMonthly ? Icons.calendar_month_rounded : Icons.bar_chart_rounded,
+                        color: AppTheme.white,
+                        size: 18,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                source.label,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                '${source.points} poin',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: source.color,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: AnimatedBuilder(
-                              animation: _pointsAnimation,
-                              builder: (context, child) {
-                                return LinearProgressIndicator(
-                                  value: fraction * _pointsAnimation.value,
-                                  minHeight: 6,
-                                  backgroundColor: AppTheme.grey100,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    source.color,
-                                  ),
-                                );
-                              },
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
                             ),
+                          ),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                              color: AppTheme.grey400,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-              );
-            }),
-          ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 130,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: List.generate(
+                      min(isMonthly ? 12 : 7, data.length),
+                      (index) {
+                        final value = data[index];
+                        final heightFraction = value / effectiveMax;
+                        final isToday = !isMonthly ? index == data.length - 1 : index == DateTime.now().month - 1;
+
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: isMonthly ? 2.0 : 4.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '+$value',
+                                  style: TextStyle(
+                                    fontSize: isMonthly ? 7.5 : 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: isToday
+                                        ? AppTheme.primaryGreen
+                                        : AppTheme.grey400,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.visible,
+                                ),
+                                const SizedBox(height: 4),
+                                AnimatedBuilder(
+                                  animation: _pointsAnimation,
+                                  builder: (context, child) {
+                                    return Container(
+                                      height: (90 * heightFraction * _pointsAnimation.value)
+                                          .clamp(isMonthly ? 2.0 : 4.0, 90.0),
+                                      decoration: BoxDecoration(
+                                        gradient: isToday
+                                            ? AppTheme.mainGradient
+                                            : LinearGradient(
+                                                colors: [
+                                                  AppTheme.emerald.withOpacity(0.4),
+                                                  AppTheme.emerald.withOpacity(0.2),
+                                                ],
+                                                begin: Alignment.bottomCenter,
+                                                end: Alignment.topCenter,
+                                              ),
+                                        borderRadius: BorderRadius.circular(isMonthly ? 4 : 8),
+                                        boxShadow: isToday
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppTheme.primaryGreen
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  index < labels.length
+                                      ? labels[index]
+                                      : '',
+                                  style: TextStyle(
+                                    fontSize: isMonthly ? 8.5 : 10,
+                                    fontWeight: isToday
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isToday
+                                        ? AppTheme.primaryGreen
+                                        : AppTheme.grey400,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.visible,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1485,31 +1515,6 @@ class _ProfilePageState extends State<ProfilePage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.military_tech_rounded,
-                  size: 18, color: AppTheme.gold),
-              const SizedBox(width: 8),
-              const Text(
-                'Pencapaian',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '$achievedCount/${_badges.length}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.grey400,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
           if (_badges.isEmpty)
             Center(
               child: Padding(
@@ -2119,105 +2124,69 @@ class _StudentDetailSheetState extends State<_StudentDetailSheet> {
                         color: AppTheme.primaryGreen),
                   ),
                 )
-              else if (_detail != null && _detail!.badges.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppTheme.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: AppTheme.softShadow,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.military_tech_rounded,
-                                size: 18, color: AppTheme.gold),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Pencapaian',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              '${_detail!.badges.where((b) => b.isAchieved).length}/${_detail!.badges.length}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        for (int i = 0; i < _detail!.badges.length; i += 2)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                    child: widget
-                                        .buildBadgeCard(_detail!.badges[i])),
-                                const SizedBox(width: 10),
-                                if (i + 1 < _detail!.badges.length)
-                                  Expanded(
-                                      child: widget.buildBadgeCard(
-                                          _detail!.badges[i + 1]))
-                                else
-                                  const Expanded(child: SizedBox()),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 16),
-              // Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
-                      foregroundColor: AppTheme.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+              else if (_detail != null)
+                Builder(builder: (context) {
+                  final activeBadges = _detail!.badges.where((b) => b.isAchieved).toList();
+                  if (activeBadges.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppTheme.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: AppTheme.softShadow,
                       ),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.person_rounded, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          widget.entry.isMe
-                              ? 'Lihat Profil Saya'
-                              : 'Lihat Profil ${widget.entry.name.split(' ').first}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.military_tech_rounded,
+                                  size: 18, color: AppTheme.gold),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Pencapaian',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${activeBadges.length} badge',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.grey400,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 14),
+                          for (int i = 0; i < activeBadges.length; i += 2)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                      child: widget.buildBadgeCard(activeBadges[i])),
+                                  const SizedBox(width: 10),
+                                  if (i + 1 < activeBadges.length)
+                                    Expanded(
+                                        child: widget.buildBadgeCard(activeBadges[i + 1]))
+                                  else
+                                    const Expanded(child: SizedBox()),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                  );
+                }),
+              const SizedBox(height: 16),
               const SizedBox(height: 70),
             ],
           ),

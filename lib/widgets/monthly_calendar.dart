@@ -261,9 +261,7 @@ class _MonthlyCalendarState extends State<MonthlyCalendar>
           final prayerCount = _prayerData[key];
 
           return GestureDetector(
-            onTap: isFuture
-                ? null
-                : () => _showDayDetail(context, date, prayerCount ?? 0),
+            onTap: () => _showDayDetail(context, date, isFuture, prayerCount ?? 0),
             child: _buildDayCell(dayNum, isToday, isFuture, prayerCount),
           );
         },
@@ -406,11 +404,15 @@ class _MonthlyCalendarState extends State<MonthlyCalendar>
     );
   }
 
-  void _showDayDetail(BuildContext context, DateTime date, int count) {
-    showPrayerTrackingSheet(
-      context,
-      date: date,
-      prayerCount: count,
-    );
+  void _showDayDetail(BuildContext context, DateTime date, bool isFuture, int count) {
+    if (isFuture) {
+      showFutureDateBlockedSheet(context, date);
+    } else {
+      showPrayerTrackingSheet(
+        context,
+        date: date,
+        prayerCount: count,
+      );
+    }
   }
 }

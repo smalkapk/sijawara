@@ -9,9 +9,11 @@ import '../widgets/bottom_menu.dart';
 import '../widgets/monthly_calendar.dart';
 import '../widgets/point_animation.dart';
 import '../widgets/skeleton_loader.dart';
+import '../widgets/wali_guru_input.dart';
 import '../widgets/wali_maklumat_widget.dart';
 import '../services/prayer_service.dart';
 import '../services/auth_service.dart';
+import '../services/page_cache.dart';
 import 'quran_page.dart';
 import 'profile_page.dart';
 
@@ -23,7 +25,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late PageController _pageController; // vertical: calendar/home
@@ -76,8 +78,22 @@ class _HomePageState extends State<HomePage>
     _loadStudentData();
   }
 
-  /// Load data student dari server (poin, streak, nama)
+  /// Load data student — cek cache dulu, lalu fetch dari server jika cache kosong.
   Future<void> _loadStudentData() async {
+    // Gunakan cache jika masih segar (30 menit)
+    if (PageCache.homeStudentData != null &&
+        PageCache.isFresh(PageCache.homeTimestamp)) {
+      final cached = PageCache.homeStudentData!;
+      if (!mounted) return;
+      setState(() {
+        _totalPoints = cached.totalPoints;
+        _streak = cached.streak;
+        _studentName = cached.name.isNotEmpty ? cached.name : 'Sahabat Muslim';
+        _isLoadingData = false;
+      });
+      return;
+    }
+
     try {
       final isLoggedIn = await AuthService.isLoggedIn();
       if (!isLoggedIn) {
@@ -87,6 +103,11 @@ class _HomePageState extends State<HomePage>
 
       final data = await PrayerService.getStudentData();
       if (!mounted) return;
+
+      // Simpan ke cache
+      PageCache.homeStudentData = data;
+      PageCache.homeTimestamp = DateTime.now();
+
       setState(() {
         _totalPoints = data.totalPoints;
         _streak = data.streak;
@@ -100,18 +121,21 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  /// Refresh all data (pull-to-refresh)
+  /// Refresh all data (pull-to-refresh) — clear cache home lalu fetch ulang
   Future<void> _refreshData() async {
     setState(() => _isRefreshing = true);
-    
+
+    // Hapus cache agar data diambil segar dari server
+    PageCache.clearHome();
+
     try {
       // Reload student data
       await _loadStudentData();
-      
+
       // Refresh child widgets (using dynamic cast since states are private)
       (_calendarKey.currentState as dynamic)?.refreshData();
       (_prayerKey.currentState as dynamic)?.refreshData();
-      
+
       if (!mounted) return;
     } catch (e) {
       debugPrint('Gagal refresh data: $e');
@@ -281,8 +305,13 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  // Pertahankan state agar tidak di-dispose saat scroll horizontal PageView
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context); // diperlukan oleh AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppTheme.bgColor,
       body: FadeTransition(
@@ -446,16 +475,9 @@ class _HomePageState extends State<HomePage>
             padding: const EdgeInsets.only(bottom: 16),
             child: Column(
               children: [
+                const SizedBox(height: 16),
                 Icon(Icons.keyboard_arrow_down_rounded,
                     size: 20, color: AppTheme.grey400),
-                Text(
-                  'Swipe ke bawah untuk kembali',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.grey400,
-                  ),
-                ),
               ],
             ),
           ),
@@ -492,12 +514,22 @@ class _HomePageState extends State<HomePage>
                         ? const HorizontalCalendarSkeleton()
                         : HorizontalCalendar(
                             key: _calendarKey,
-                            onDateTap: (date) => showPrayerTrackingSheet(
-                              context,
-                              date: date,
-                              onPointsEarned: _onPointsEarned,
-                              onPrayerSaved: _onPrayerSaved,
-                            ),
+                            onDateTap: (date) {
+                              final now = DateTime.now();
+                              final today = DateTime(now.year, now.month, now.day);
+                              final targetDate = DateTime(date.year, date.month, date.day);
+                              
+                              if (targetDate.isAfter(today)) {
+                                showFutureDateBlockedSheet(context, date);
+                              } else {
+                                showPrayerTrackingSheet(
+                                  context,
+                                  date: date,
+                                  onPointsEarned: _onPointsEarned,
+                                  onPrayerSaved: _onPrayerSaved,
+                                );
+                              }
+                            },
                           ),
                     const SizedBox(height: 16),
                     _isLoadingData
@@ -510,13 +542,38 @@ class _HomePageState extends State<HomePage>
                           ),
                     const SizedBox(height: 28),
                     _isLoadingData
-                        ? const MenuButtonsSkeleton()
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                child: SkeletonLoader(
+                                  height: 110,
+                                  width: double.infinity,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const MenuButtonsSkeleton(),
+                              const SizedBox(height: 16),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                child: SkeletonLoader(
+                                  height: 150,
+                                  width: double.infinity,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                            ],
+                          )
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              WaliMaklumatWidget(),
-                              SizedBox(height: 16),
-                              MenuButtonsSection(),
+                            children: [
+                              const WaliMaklumatWidget(),
+                              const SizedBox(height: 16),
+                              const MenuButtonsSection(),
+                              const SizedBox(height: 16),
+                              WaliGuruInput(refreshKey: const ValueKey('siswa_berita')),
                             ],
                           ),
                     const SizedBox(height: 120),
@@ -593,14 +650,16 @@ class _HomePageState extends State<HomePage>
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  _studentName,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
+                _isLoadingData
+                    ? const SkeletonLoader(width: 150, height: 26)
+                    : Text(
+                        _studentName.isNotEmpty ? _studentName : '...',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                            ),
                       ),
-                ),
               ],
             ),
           ),
@@ -635,30 +694,33 @@ class _HomePageState extends State<HomePage>
                         size: 22,
                       ),
                       const SizedBox(width: 4),
-                      _isHeaderCounting && _headerCountAnim != null
-                          ? AnimatedBuilder(
-                              animation: _headerCountAnim!,
-                              builder: (context, _) {
-                                return Text(
-                                  '${_headerCountAnim!.value}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFFD97706),
-                                    height: 1,
-                                  ),
-                                );
-                              },
-                            )
-                          : Text(
-                              '$_totalPoints',
-                              style: TextStyle(
+                      if (_isLoadingData)
+                        const SkeletonLoader(width: 30, height: 14)
+                      else if (_isHeaderCounting && _headerCountAnim != null)
+                        AnimatedBuilder(
+                          animation: _headerCountAnim!,
+                          builder: (context, _) {
+                            return Text(
+                              '${_headerCountAnim!.value}',
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
-                                color: const Color(0xFFD97706),
+                                color: Color(0xFFD97706),
                                 height: 1,
                               ),
-                            ),
+                            );
+                          },
+                        )
+                      else
+                        Text(
+                          '$_totalPoints',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFD97706),
+                            height: 1,
+                          ),
+                        ),
                     ],
                   ),
                 ),

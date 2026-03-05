@@ -122,6 +122,7 @@ class ProfileData {
   final StudentProfile profile;
   final List<int> weeklyPoints;
   final List<String> dayLabels;
+  final List<int> monthlyPoints;
   final List<PointSource> pointsBreakdown;
   final List<BadgeInfo> badges;
   final List<String> newBadges;
@@ -131,6 +132,7 @@ class ProfileData {
     required this.profile,
     required this.weeklyPoints,
     required this.dayLabels,
+    required this.monthlyPoints,
     required this.pointsBreakdown,
     required this.badges,
     required this.newBadges,
@@ -141,6 +143,7 @@ class ProfileData {
     final profileJson = json['profile'] as Map<String, dynamic>;
     final weeklyList = (json['weekly_points'] as List).cast<int>();
     final dayList = (json['day_labels'] as List).cast<String>();
+    final monthlyList = (json['monthly_points'] as List?)?.cast<int>() ?? List.filled(12, 0);
 
     final breakdownList = (json['points_breakdown'] as List)
         .map((e) => PointSource.fromJson(e as Map<String, dynamic>))
@@ -166,6 +169,7 @@ class ProfileData {
       profile: StudentProfile.fromJson(profileJson),
       weeklyPoints: weeklyList,
       dayLabels: dayList,
+      monthlyPoints: monthlyList,
       pointsBreakdown: breakdownList,
       badges: badgeList,
       newBadges: newBadges,

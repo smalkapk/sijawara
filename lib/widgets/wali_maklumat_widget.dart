@@ -226,45 +226,32 @@ class _WaliMaklumatWidgetState extends State<WaliMaklumatWidget> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Category
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                      // Category chip only
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: item.iconColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(item.iconData, size: 14, color: item.iconColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              item.kategori.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: item.iconColor,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                            decoration: BoxDecoration(
-                              color: item.iconColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(item.iconData, size: 14, color: item.iconColor),
-                                const SizedBox(width: 4),
-                                Text(
-                                  item.kategori.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: item.iconColor,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            item.formattedDate,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       
@@ -278,8 +265,53 @@ class _WaliMaklumatWidgetState extends State<WaliMaklumatWidget> {
                           height: 1.3,
                         ),
                       ),
+                      const SizedBox(height: 8),
+
+                      // Tanggal & nama guru di bawah judul
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today_rounded,
+                              size: 13, color: AppTheme.grey400),
+                          const SizedBox(width: 5),
+                          Text(
+                            item.formattedDate,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          if (item.guruName != null && item.guruName!.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.grey100,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.person_rounded,
+                                      size: 12, color: AppTheme.grey400),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    item.guruName!,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.grey400,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                       const SizedBox(height: 16),
-                      
+
                       // Content
                       Text(
                         item.deskripsi,
@@ -290,25 +322,6 @@ class _WaliMaklumatWidgetState extends State<WaliMaklumatWidget> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Guru name if available
-                      if (item.guruName != null && item.guruName!.isNotEmpty) ...[
-                        Row(
-                          children: [
-                            const Icon(Icons.person_rounded, size: 14, color: AppTheme.grey400),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Dari: ${item.guruName}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.grey400,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                      ],
 
                       // Optional PDF Attachment
                       if (item.pdfUrl != null && item.pdfUrl!.isNotEmpty) ...[
@@ -391,29 +404,6 @@ class _WaliMaklumatWidgetState extends State<WaliMaklumatWidget> {
                             color: AppTheme.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.share_rounded, size: 20, color: Colors.white),
-                        label: const Text(
-                          'Bagikan',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryGreen,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                          ),
-                          elevation: 0,
                         ),
                       ),
                     ),

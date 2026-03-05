@@ -101,16 +101,15 @@ class _BottomMenuState extends State<BottomMenu> {
         opacity: widget.isVisible ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 250),
         child: Container(
-          margin: EdgeInsets.fromLTRB(24, 0, 24, 12 + bottomPadding),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          padding: EdgeInsets.only(top: 12, bottom: 12 + bottomPadding),
           decoration: BoxDecoration(
             color: AppTheme.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.06),
                 blurRadius: 20,
-                offset: const Offset(0, 6),
+                offset: const Offset(0, -6),
                 spreadRadius: -4,
               ),
             ],
@@ -210,7 +209,7 @@ class _MenuButtonState extends State<_MenuButton>
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: SizedBox(
-          width: 56,
+          width: 70,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

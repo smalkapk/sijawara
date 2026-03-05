@@ -124,41 +124,49 @@ class TahfidzStudent {
 }
 
 // ═══════════════════════════════════════
-// Model: Setoran
+// Model: Setoran Item (single surah in a report)
 // ═══════════════════════════════════════
-class TahfidzSetoran {
+class SetoranItem {
   final String id;
   final int surahNumber;
   final int ayatFrom;
   final int ayatTo;
-  final String grade;       // A, B+, B, C, D
-  final String gradeLabel;  // Mumtaz, Jayyid Jiddan, dst
-  final String notes;
-  final int points;
-  final String guruName;
-  final DateTime setoranAt;
+  final String grade;      // A, B+, B, C, D
+  final String gradeLabel; // Mumtaz, Jayyid Jiddan, dst
 
-  TahfidzSetoran({
-    required this.id,
+  SetoranItem({
+    this.id = '',
     required this.surahNumber,
     required this.ayatFrom,
     required this.ayatTo,
-    this.grade = 'C',
+    this.grade = 'B',
     this.gradeLabel = '',
-    this.notes = '',
-    this.points = 0,
-    this.guruName = '',
-    DateTime? setoranAt,
-  }) : setoranAt = setoranAt ?? DateTime.now();
+  });
 
-  /// Nama surah dari lookup
   String get surahName => surahNames[surahNumber] ?? 'Surah $surahNumber';
-
-  /// Range ayat terformat: "1-10" atau "1-7" dst
   String get ayatRange => '$ayatFrom-$ayatTo';
 
-  factory TahfidzSetoran.fromJson(Map<String, dynamic> json) {
-    return TahfidzSetoran(
+  /// Create a copy with optional overrides
+  SetoranItem copyWith({
+    String? id,
+    int? surahNumber,
+    int? ayatFrom,
+    int? ayatTo,
+    String? grade,
+    String? gradeLabel,
+  }) {
+    return SetoranItem(
+      id: id ?? this.id,
+      surahNumber: surahNumber ?? this.surahNumber,
+      ayatFrom: ayatFrom ?? this.ayatFrom,
+      ayatTo: ayatTo ?? this.ayatTo,
+      grade: grade ?? this.grade,
+      gradeLabel: gradeLabel ?? this.gradeLabel,
+    );
+  }
+
+  factory SetoranItem.fromJson(Map<String, dynamic> json) {
+    return SetoranItem(
       id: json['id']?.toString() ?? '',
       surahNumber: json['surah_number'] is int
           ? json['surah_number']
@@ -169,6 +177,98 @@ class TahfidzSetoran {
       ayatTo: json['ayat_to'] is int
           ? json['ayat_to']
           : int.parse(json['ayat_to'].toString()),
+      grade: json['grade'] as String? ?? 'B',
+      gradeLabel: json['grade_label'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'surah_number': surahNumber,
+        'ayat_from': ayatFrom,
+        'ayat_to': ayatTo,
+        'grade': grade,
+        'grade_label': gradeLabel,
+      };
+}
+
+// ═══════════════════════════════════════
+// Model: Setoran (supports multi-surah)
+// ═══════════════════════════════════════
+class TahfidzSetoran {
+  final String id;
+  final String? groupId;
+  final List<SetoranItem> items;
+  final String grade;       // A, B+, B, C, D
+  final String gradeLabel;  // Mumtaz, Jayyid Jiddan, dst
+  final String notes;
+  final int points;
+  final String guruName;
+  final DateTime setoranAt;
+
+  TahfidzSetoran({
+    required this.id,
+    this.groupId,
+    this.items = const [],
+    this.grade = 'C',
+    this.gradeLabel = '',
+    this.notes = '',
+    this.points = 0,
+    this.guruName = '',
+    DateTime? setoranAt,
+  }) : setoranAt = setoranAt ?? DateTime.now();
+
+  // ── Backward compat: first item fields ──
+  int get surahNumber => items.isNotEmpty ? items.first.surahNumber : 0;
+  int get ayatFrom => items.isNotEmpty ? items.first.ayatFrom : 0;
+  int get ayatTo => items.isNotEmpty ? items.first.ayatTo : 0;
+
+  /// Nama surah (gabungan jika multi-surah)
+  String get surahName {
+    if (items.isEmpty) return '-';
+    if (items.length == 1) return items.first.surahName;
+    return items.map((i) => i.surahName).join(', ');
+  }
+
+  /// Range ayat (gabungan jika multi-surah)
+  String get ayatRange {
+    if (items.isEmpty) return '-';
+    if (items.length == 1) return items.first.ayatRange;
+    return items.map((i) => '${i.surahName}: ${i.ayatRange}').join('\n');
+  }
+
+  /// True jika laporan ini punya lebih dari 1 surah
+  bool get isMultiSurah => items.length > 1;
+
+  factory TahfidzSetoran.fromJson(Map<String, dynamic> json) {
+    // Parse items array (new format) or build from flat fields (old format)
+    List<SetoranItem> items;
+    if (json['items'] != null && json['items'] is List) {
+      items = (json['items'] as List)
+          .map((e) => SetoranItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } else {
+      // Legacy single-surah format
+      items = [
+        SetoranItem(
+          id: json['id']?.toString() ?? '',
+          surahNumber: json['surah_number'] is int
+              ? json['surah_number']
+              : int.parse(json['surah_number']?.toString() ?? '0'),
+          ayatFrom: json['ayat_from'] is int
+              ? json['ayat_from']
+              : int.parse(json['ayat_from']?.toString() ?? '0'),
+          ayatTo: json['ayat_to'] is int
+              ? json['ayat_to']
+              : int.parse(json['ayat_to']?.toString() ?? '0'),
+        ),
+      ];
+    }
+
+    return TahfidzSetoran(
+      id: json['id']?.toString() ?? '',
+      groupId: json['group_id']?.toString(),
+      items: items,
       grade: json['grade'] as String? ?? 'C',
       gradeLabel: json['grade_label'] as String? ?? '',
       notes: json['notes'] as String? ?? '',
@@ -184,9 +284,8 @@ class TahfidzSetoran {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'surah_number': surahNumber,
-        'ayat_from': ayatFrom,
-        'ayat_to': ayatTo,
+        'group_id': groupId,
+        'items': items.map((i) => i.toJson()).toList(),
         'grade': grade,
         'grade_label': gradeLabel,
         'notes': notes,
@@ -375,12 +474,10 @@ class TahfidzService {
     return _getMySetoranFromCache();
   }
 
-  // ── POST: Simpan setoran baru ──
+  // ── POST: Simpan setoran baru (multi-surah) ──
   static Future<String> addSetoran({
     required int studentId,
-    required int surahNumber,
-    required int ayatFrom,
-    required int ayatTo,
+    required List<SetoranItem> surahs,
     required String grade,
     String notes = '',
   }) async {
@@ -394,10 +491,13 @@ class TahfidzService {
         },
         body: jsonEncode({
           'student_id': studentId,
-          'surah_number': surahNumber,
-          'ayat_from': ayatFrom,
-          'ayat_to': ayatTo,
-          'grade': grade,
+          'surahs': surahs.map((s) => {
+            'surah_number': s.surahNumber,
+            'ayat_from': s.ayatFrom,
+            'ayat_to': s.ayatTo,
+            'grade': s.grade,
+          }).toList(),
+          'grade': grade, // fallback global
           'notes': notes,
         }),
       ).timeout(const Duration(seconds: 15));
@@ -413,13 +513,12 @@ class TahfidzService {
     }
   }
 
-  // ── POST: Update setoran ──
+  // ── POST: Update setoran (multi-surah) ──
   static Future<void> updateSetoran({
     required String id,
+    String? groupId,
     required int studentId,
-    required int surahNumber,
-    required int ayatFrom,
-    required int ayatTo,
+    required List<SetoranItem> surahs,
     required String grade,
     String notes = '',
   }) async {
@@ -433,11 +532,15 @@ class TahfidzService {
         },
         body: jsonEncode({
           'id': id,
+          'group_id': groupId,
           'student_id': studentId,
-          'surah_number': surahNumber,
-          'ayat_from': ayatFrom,
-          'ayat_to': ayatTo,
-          'grade': grade,
+          'surahs': surahs.map((s) => {
+            'surah_number': s.surahNumber,
+            'ayat_from': s.ayatFrom,
+            'ayat_to': s.ayatTo,
+            'grade': s.grade,
+          }).toList(),
+          'grade': grade, // fallback global
           'notes': notes,
         }),
       ).timeout(const Duration(seconds: 15));
@@ -453,12 +556,14 @@ class TahfidzService {
     }
   }
 
-  // ── DELETE: Hapus setoran ──
-  static Future<void> deleteSetoran(String id) async {
+  // ── DELETE: Hapus setoran (by id, auto-deletes group) ──
+  static Future<void> deleteSetoran(String id, {String? groupId}) async {
     try {
       final token = await AuthService.getToken();
+      String url = '$_baseUrl/tahfidz.php?id=$id';
+      if (groupId != null) url += '&group_id=$groupId';
       final response = await http.delete(
-        Uri.parse('$_baseUrl/tahfidz.php?id=$id'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

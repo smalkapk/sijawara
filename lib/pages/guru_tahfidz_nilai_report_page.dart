@@ -276,14 +276,101 @@ class _GuruTahfidzNilaiReportPageState
               ],
             ),
             const SizedBox(height: 20),
-            _buildReportItem('Surah', report.surahName),
+            // Multi-surah: show each item with per-surah grade
+            if (report.isMultiSurah) ...[
+              _buildReportItem('Surah', ''),
+              ...report.items.map((item) {
+                final gColor = _gradeColor(item.grade);
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryGreen,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${item.surahName} — Ayat ${item.ayatFrom}-${item.ayatTo}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: gColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          item.grade,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: gColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ] else ...[
+              _buildReportItem('Surah', report.surahName),
+              _buildDivider(),
+              _buildReportItem('Ayat', report.ayatRange),
+            ],
             _buildDivider(),
-            _buildReportItem('Ayat', report.ayatRange),
-            _buildDivider(),
-            _buildReportItem(
-              'Predikat Nilai',
-              '${report.grade} (${report.gradeLabel})',
-            ),
+            if (report.isMultiSurah) ...[
+              _buildReportItem('Predikat Nilai', ''),
+              ...report.items.map((item) {
+                final gColor = _gradeColor(item.grade);
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: gColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          item.grade,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: gColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        item.surahName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ] else
+              _buildReportItem(
+                'Predikat Nilai',
+                report.grade,
+              ),
             _buildDivider(),
             _buildReportItem(
               'Catatan Guru',
@@ -330,6 +417,17 @@ class _GuruTahfidzNilaiReportPageState
         color: AppTheme.grey100,
       ),
     );
+  }
+
+  Color _gradeColor(String grade) {
+    switch (grade) {
+      case 'A':  return const Color(0xFF7C3AED);
+      case 'B+': return const Color(0xFF3B82F6);
+      case 'B':  return const Color(0xFF059669);
+      case 'C':  return const Color(0xFFF59E0B);
+      case 'D':  return const Color(0xFFEF4444);
+      default:   return AppTheme.grey400;
+    }
   }
 
   void _openSurahDetail(Surah surah, {int initialAyat = 1}) {
@@ -392,7 +490,7 @@ class _GuruTahfidzNilaiReportPageState
                   const SizedBox(height: 16),
                   // ── Title ──
                   const Text(
-                    'Ingin dilihatkan ke Surat Lainnya?',
+                    'Membuka Surat Lainnya?',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -405,7 +503,7 @@ class _GuruTahfidzNilaiReportPageState
                   Text(
                     'Berdasarkan laporan terakhir, siswa sudah selesai '
                     'menghafalkan surat ${completedSurah.name}, '
-                    'ingin menuju surat lainnya?',
+                    'ingin membuka surat lainnya?',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -525,6 +623,7 @@ class _GuruTahfidzNilaiReportPageState
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                        border: Border.all(color: AppTheme.grey400),
                       ),
                       child: Text(
                         'Tetap Buka ${completedSurah.name}',
@@ -532,7 +631,7 @@ class _GuruTahfidzNilaiReportPageState
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.grey400,
+                          color: AppTheme.black,
                         ),
                       ),
                     ),
@@ -601,55 +700,15 @@ class _GuruTahfidzNilaiReportPageState
                   ),
                   const SizedBox(height: 8),
                   // ── Subtitle ──
-                  RichText(
+                  Text(
+                    report.isMultiSurah
+                        ? 'Capaian yang dipilih pada ${report.items.length} surat (${report.surahName}), lanjutkan?'
+                        : 'Capaian yang dipilih pada surat ${report.surahName}, ayat ${report.ayatFrom} - ${report.ayatTo}, lanjutkan?',
                     textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                        height: 1.5,
-                      ),
-                      children: [
-                        const TextSpan(
-                          text: 'Capaian yang dipilih pada surat ',
-                        ),
-                        TextSpan(
-                          text: report.surahName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        TextSpan(
-                          text: ', ayat ',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '${report.ayatFrom}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        TextSpan(
-                          text: ' - ayat ',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '${report.ayatTo}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        const TextSpan(text: ', lanjutkan?'),
-                      ],
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      height: 1.5,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -660,7 +719,10 @@ class _GuruTahfidzNilaiReportPageState
                         : () async {
                             setModalState(() => isDeleting = true);
                             try {
-                              await TahfidzService.deleteSetoran(report.id);
+                              await TahfidzService.deleteSetoran(
+                                report.id,
+                                groupId: report.groupId,
+                              );
                               if (ctx.mounted) Navigator.pop(ctx);
                               if (mounted) {
                                 setState(() => _selectedReportIndex = null);
@@ -773,7 +835,7 @@ class _GuruTahfidzNilaiReportPageState
                     if (lastReport.ayatTo >= surahData.ayatCount) {
                       _showSurahPickerBottomSheet(surahData);
                     } else {
-                      _openSurahDetail(surahData, initialAyat: lastReport.ayatFrom);
+                      _openSurahDetail(surahData, initialAyat: lastReport.ayatTo);
                     }
                   },
                   child: Container(
@@ -830,6 +892,7 @@ class _GuruTahfidzNilaiReportPageState
                   if (hasSelection) {
                     final sel = _reports[_selectedReportIndex!];
                     formData['id'] = sel.id;
+                    formData['group_id'] = sel.groupId;
                     formData['surah_number'] = sel.surahNumber;
                     formData['surahName'] = sel.surahName;
                     formData['ayatRange'] = sel.ayatRange;
@@ -837,6 +900,8 @@ class _GuruTahfidzNilaiReportPageState
                     formData['ayat_to'] = sel.ayatTo;
                     formData['grade'] = sel.grade;
                     formData['notes'] = sel.notes;
+                    // Pass items list for multi-surah editing
+                    formData['items'] = sel.items.map((i) => i.toJson()).toList();
                     editing = true;
                   }
 

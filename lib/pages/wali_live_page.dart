@@ -855,8 +855,39 @@ class _WaliLivePageState extends State<WaliLivePage> {
                     ),
                   ),
 
-                  // Badge
-                  if (event.badge != null) ...[
+                  // Badge(s)
+                  if (event.type == 'tahfidz' &&
+                      event.badges != null &&
+                      event.badges!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: event.badges!.map((b) {
+                        final grade = b['grade'] ?? '';
+                        final surah = b['surah'] ?? '';
+                        final color = _getBadgeColor(grade);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            event.badges!.length > 1
+                                ? '$surah: $grade'
+                                : grade,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ] else if (event.badge != null) ...[
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -976,12 +1007,17 @@ class _WaliLivePageState extends State<WaliLivePage> {
         return AppTheme.primaryGreen;
       case 'combo':
         return const Color(0xFFEA580C);
-      case 'mumtaz':
+      // Letter grades
+      case 'a':
         return const Color(0xFF7C3AED);
-      case 'jayyid jiddan':
+      case 'b+':
         return const Color(0xFF3B82F6);
-      case 'jayyid':
+      case 'b':
         return const Color(0xFF059669);
+      case 'c':
+        return const Color(0xFFF59E0B);
+      case 'd':
+        return const Color(0xFFEF4444);
       default:
         return AppTheme.grey400;
     }

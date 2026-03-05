@@ -5,6 +5,7 @@ import '../theme.dart';
 import '../widgets/bottom_menu.dart';
 import '../services/quran_reading_service.dart';
 import '../services/tahfidz_service.dart';
+import '../services/page_cache.dart';
 import 'surah_detail_page.dart';
 
 // ── Data Model ──
@@ -150,7 +151,7 @@ class QuranPage extends StatefulWidget {
   State<QuranPage> createState() => _QuranPageState();
 }
 
-class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
+class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -186,12 +187,28 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
   }
 
   Future<void> _loadSetoran() async {
+    // Gunakan cache jika masih segar (30 menit)
+    if (PageCache.setoranList != null &&
+        PageCache.isFresh(PageCache.setoranTimestamp)) {
+      if (mounted) {
+        setState(() {
+          _setoranList = PageCache.setoranList!;
+          _isLoadingSetoran = false;
+        });
+      }
+      return;
+    }
+
     try {
       final data = await TahfidzService.getMySetoran();
       if (mounted) {
+        final list = data.reversed.toList();
+        // Simpan ke cache
+        PageCache.setoranList = list;
+        PageCache.setoranTimestamp = DateTime.now();
         setState(() {
           // API returns DESC, reverse to ASC for display logic
-          _setoranList = data.reversed.toList();
+          _setoranList = list;
           _isLoadingSetoran = false;
         });
       }
@@ -202,6 +219,13 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
     }
   }
 
+  /// Pull-to-refresh: hapus cache dan fetch ulang dari server
+  Future<void> _refreshSetoran() async {
+    PageCache.clearQuran();
+    setState(() => _isLoadingSetoran = true);
+    await _loadSetoran();
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -209,8 +233,13 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  // Pertahankan state agar tidak di-dispose saat scroll horizontal PageView
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context); // diperlukan oleh AutomaticKeepAliveClientMixin
     return Scaffold(
       backgroundColor: AppTheme.bgColor,
       body: SafeArea(
@@ -351,11 +380,6 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       slivers: [
-        // ── Riwayat Section ──
-        SliverToBoxAdapter(
-          child: _buildRiwayatSection(),
-        ),
-
         // ── Tandai (Bookmark) Section ──
         SliverToBoxAdapter(
           child: _buildTandaiSection(),
@@ -412,161 +436,6 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildRiwayatSection() {
-    if (_readingHistory.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 3,
-                height: 16,
-                decoration: BoxDecoration(
-                  gradient: AppTheme.mainGradient,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Riwayat Bacaan',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  // TODO: show all history
-                },
-                child: Text(
-                  'Lihat Semua',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.primaryGreen,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 88,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: _readingHistory.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final history = _readingHistory[index];
-                return _buildHistoryCard(history);
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryCard(ReadingHistoryEntry history) {
-    final timeAgo = _formatTimeAgo(history.readAt);
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SurahDetailPage(
-              surahNumber: history.surahNumber,
-              surahName: history.surahName,
-              arabicName: history.arabicName,
-            ),
-          ),
-        ).then((_) => _loadReadingHistory());
-      },
-      child: Container(
-      width: 170,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.mainGradient,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${history.surahNumber}',
-                  style: const TextStyle(
-                    color: AppTheme.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  history.surahName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Icon(Icons.bookmark_rounded,
-                  size: 12, color: AppTheme.primaryGreen),
-              const SizedBox(width: 4),
-              Text(
-                'Ayat ${history.lastAyat}',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.primaryGreen,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                timeAgo,
-                style: TextStyle(
-                  fontSize: 9,
-                  color: AppTheme.grey400,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
     );
   }
 
@@ -941,7 +810,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadSetoran,
+      onRefresh: _refreshSetoran,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
@@ -1179,86 +1048,278 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
 
   // ── Stats Row (mini) ──
   Widget _buildSetoranStatsRow() {
-    // Count values per grade (B+ grouped with B)
-    final countA = _setoranList.where((s) => s.grade == 'A').length;
-    final countB = _setoranList.where((s) => s.grade == 'B' || s.grade == 'B+').length;
-    final countC = _setoranList.where((s) => s.grade == 'C').length;
-    final countD = _setoranList.where((s) => s.grade == 'D').length;
+    // Collect setoran values per grade (B+ grouped with B)
+    final listA = _setoranList.where((s) => s.grade == 'A').toList();
+    final listB = _setoranList.where((s) => s.grade == 'B' || s.grade == 'B+').toList();
+    final listC = _setoranList.where((s) => s.grade == 'C').toList();
+    final listD = _setoranList.where((s) => s.grade == 'D').toList();
 
     return Row(
       children: [
         Expanded(
-          child: _buildMiniStat('A', '$countA', const Color(0xFF059669)),
+          child: _buildMiniStat('A', '${listA.length}', const Color(0xFF059669), () => _showGradeDetails('A', listA, const Color(0xFF059669))),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildMiniStat('B', '$countB', AppTheme.softBlue),
+          child: _buildMiniStat('B', '${listB.length}', AppTheme.softBlue, () => _showGradeDetails('B', listB, AppTheme.softBlue)),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildMiniStat('C', '$countC', AppTheme.gold),
+          child: _buildMiniStat('C', '${listC.length}', AppTheme.gold, () => _showGradeDetails('C', listC, AppTheme.gold)),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildMiniStat('D', '$countD', const Color(0xFFEF4444)),
+          child: _buildMiniStat('D', '${listD.length}', const Color(0xFFEF4444), () => _showGradeDetails('D', listD, const Color(0xFFEF4444))),
         ),
       ],
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
+  Widget _buildMiniStat(String label, String value, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: color,
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.textPrimary,
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Nilai $label',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.grey400,
+            const SizedBox(height: 2),
+            Text(
+              'Nilai $label',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.grey400,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  void _showGradeDetails(String grade, List<TahfidzSetoran> list, Color color) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: const BoxDecoration(
+            color: AppTheme.bgColor,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.grey200,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Title
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        grade,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Daftar Nilai $grade',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '${list.length} surat dengan nilai ini',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.grey400,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close_rounded, color: AppTheme.grey400, size: 24),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppTheme.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: AppTheme.grey100),
+              
+              // List
+              Expanded(
+                child: list.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Belum ada surat dengan nilai $grade',
+                          style: TextStyle(
+                            color: AppTheme.grey400,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: list.length,
+                        itemBuilder: (context, index) {
+                          final setoran = list[index];
+                          final dateFormat = DateFormat('dd MMM yyyy', 'id_ID');
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: AppTheme.softShadow,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: color.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.auto_stories_rounded,
+                                    size: 20,
+                                    color: color,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'QS. ${setoran.surahName}',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Ayat ${setoran.ayatFrom} - ${setoran.ayatTo}  •  ${dateFormat.format(setoran.setoranAt)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppTheme.grey400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: color.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    setoran.grade,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: color,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1512,7 +1573,7 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
                             ),
                           ),
                           Text(
-                            _nilaiLabel(setoran.grade),
+                            setoran.grade,
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -1577,23 +1638,6 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin {
         ),
       ),
     );
-  }
-
-  String _nilaiLabel(String nilai) {
-    switch (nilai) {
-      case 'A':
-        return 'Mumtaz';
-      case 'B+':
-        return 'Jayyid Jiddan';
-      case 'B':
-        return 'Jayyid';
-      case 'C':
-        return 'Maqbul';
-      case 'D':
-        return 'Rasib';
-      default:
-        return nilai;
-    }
   }
 
   // ── Helpers ──

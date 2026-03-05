@@ -17,6 +17,7 @@ class AppTheme {
 
   // Neutral Palette
   static const Color white = Color(0xFFFFFFFF);
+  static const Color black = Color(0xFF000000);
   static const Color offWhite = Color(0xFFF8FAF9);
   static const Color bgColor = Color(0xFFF0F5F2);
   static const Color cardColor = Color(0xFFFFFFFF);

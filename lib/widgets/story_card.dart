@@ -4,6 +4,7 @@ import '../theme.dart';
 import '../pages/public_speaking_page.dart';
 import '../pages/diskusi_page.dart';
 import '../pages/siswa_evaluasi_page.dart';
+import '../pages/alka_ai_page.dart';
 
 class MenuButtonsSection extends StatelessWidget {
   const MenuButtonsSection({super.key});
@@ -21,46 +22,6 @@ class MenuButtonsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 40,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.bgColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.search_rounded,
-                        size: 18,
-                        color: AppTheme.grey400,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Cari menu...',
-                            hintStyle: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: AppTheme.grey400),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 11,
-                            ),
-                          ),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
           LayoutBuilder(
             builder: (context, constraints) {
               const double spacing = 12.0;
@@ -125,11 +86,17 @@ class MenuButtonsSection extends StatelessWidget {
                     },
                   ),
                   buildGridItem(
-                    'Aduan',
-                    Icons.campaign_rounded,
+                    'ALKA AI',
+                    Icons.auto_awesome_rounded,
                     AppTheme.teal,
                     onTap: () {
                       HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AlkaAiPage(),
+                        ),
+                      );
                     },
                   ),
                 ],

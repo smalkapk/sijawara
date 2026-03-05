@@ -753,7 +753,7 @@ class _BeritaDetailPageState extends State<BeritaDetailPage> {
             ),
             const SizedBox(width: 8),
             Text(
-              'Gagal memuat ringkasan. Ketuk untuk coba lagi.',
+              'Gagal memuat. Ketuk untuk coba lagi.',
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondary.withValues(alpha: 0.6),

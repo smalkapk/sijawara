@@ -903,6 +903,9 @@ class WaliTimelineEvent {
   final String? badge;
   final String? detail;
 
+  /// Per-surah grade badges for tahfidz events
+  final List<Map<String, String>>? badges;
+
   /// Data evaluasi guru (hanya ada kalau type == 'evaluasi')
   final int? evaluasiId;
   final Map<String, dynamic>? evaluasiData;
@@ -914,18 +917,31 @@ class WaliTimelineEvent {
     required this.type,
     this.badge,
     this.detail,
+    this.badges,
     this.evaluasiId,
     this.evaluasiData,
   });
 
   factory WaliTimelineEvent.fromJson(Map<String, dynamic> json) {
+    // Parse badges array for tahfidz per-surah grades
+    List<Map<String, String>>? parsedBadges;
+    if (json['badges'] is List) {
+      parsedBadges = (json['badges'] as List)
+          .map((b) => {
+                'surah': (b['surah'] ?? '').toString(),
+                'grade': (b['grade'] ?? '').toString(),
+              })
+          .toList();
+    }
+
     return WaliTimelineEvent(
       description: json['description'] ?? '',
       timestamp: json['timestamp'] ?? '',
       points: json['points'] ?? 0,
       type: json['type'] ?? '',
-      badge: json['badge'],
+      badge: json['badge']?.toString(),
       detail: json['detail'],
+      badges: parsedBadges,
       evaluasiId: json['evaluasi_id'] is int ? json['evaluasi_id'] : null,
       evaluasiData: json['evaluasi_data'] is Map<String, dynamic>
           ? json['evaluasi_data']

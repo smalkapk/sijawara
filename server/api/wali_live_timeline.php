@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 require_once __DIR__ . '/../config/conn.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/surah_names.php';
 
 // ═══════════════════════════════════════
 // Autentikasi
@@ -301,26 +302,69 @@ try {
 
     // ── 3h. Tahfidz Setoran ──
     $stmtTahfidz = $pdo->prepare(
-        'SELECT ts.surah_number, ts.ayat_from, ts.ayat_to, ts.grade, 
+        'SELECT ts.surah_number, ts.ayat_from, ts.ayat_to, ts.grade, ts.group_id,
                 ts.points_earned, ts.setoran_at, u.name AS guru_name
          FROM tahfidz_setoran ts
          LEFT JOIN users u ON ts.guru_tahfidz_id = u.id
          WHERE ts.student_id = :sid AND DATE(ts.setoran_at) = :d
-         ORDER BY ts.setoran_at ASC'
+         ORDER BY ts.setoran_at ASC, ts.group_id, ts.id'
     );
     $stmtTahfidz->execute(['sid' => $studentId, 'd' => $date]);
     $tahfidzs = $stmtTahfidz->fetchAll();
 
+    // Group by group_id for multi-surah reports
+    $tahfidzGrouped = [];
     foreach ($tahfidzs as $tf) {
-        $gradeLabel = str_replace('_', ' ', ucfirst($tf['grade']));
+        $gid = $tf['group_id'] ?? ('single_' . $tf['surah_number'] . '_' . $tf['setoran_at']);
+        if (!isset($tahfidzGrouped[$gid])) {
+            $tahfidzGrouped[$gid] = [
+                'items' => [],
+                'grade' => $tf['grade'],
+                'points' => 0,
+                'setoran_at' => $tf['setoran_at'],
+                'guru_name' => $tf['guru_name'],
+            ];
+        }
+        $tahfidzGrouped[$gid]['points'] += (int) $tf['points_earned'];
+        $tahfidzGrouped[$gid]['items'][] = $tf;
+    }
+
+    // Helper: map old Arabic grades to letter grades
+    $mapGrade = function ($g) {
+        switch (strtolower(trim($g))) {
+            case 'mumtaz':        return 'A';
+            case 'jayyid_jiddan':
+            case 'jayyid jiddan': return 'B+';
+            case 'jayyid':        return 'B';
+            case 'maqbul':        return 'C';
+            case 'rasib':         return 'D';
+            default:              return $g; // already A/B+/B/C/D
+        }
+    };
+
+    foreach ($tahfidzGrouped as $group) {
+        $parts = [];
+        $badges = [];
+        foreach ($group['items'] as $tf) {
+            $sName = getSurahName($tf['surah_number']);
+            $parts[] = "{$sName} ayat {$tf['ayat_from']}-{$tf['ayat_to']}";
+            $badges[] = [
+                'surah' => $sName,
+                'grade' => $mapGrade($tf['grade']),
+            ];
+        }
+        $desc = 'Menyetorkan Hafalan Tahfidz ' . implode(', ', $parts);
+        // For single badge (backward compat), use first grade letter
+        $firstGrade = count($badges) > 0 ? $badges[0]['grade'] : $mapGrade($group['grade']);
         $events[] = [
             'group'       => 'Kegiatan',
-            'description' => "Menyetorkan Hafalan Tahfidz Surah #{$tf['surah_number']} ayat {$tf['ayat_from']}-{$tf['ayat_to']}",
-            'timestamp'   => $tf['setoran_at'],
-            'points'      => (int) $tf['points_earned'],
+            'description' => $desc,
+            'timestamp'   => $group['setoran_at'],
+            'points'      => $group['points'],
             'type'        => 'tahfidz',
-            'badge'       => $gradeLabel,
-            'detail'      => $tf['guru_name'] ? "Guru: {$tf['guru_name']}" : null,
+            'badge'       => $firstGrade,
+            'badges'      => $badges,
+            'detail'      => $group['guru_name'] ? "Guru: {$group['guru_name']}" : null,
         ];
     }
 
@@ -405,6 +449,7 @@ try {
             'points'      => $ev['points'],
             'type'        => $ev['type'],
             'badge'       => $ev['badge'] ?? null,
+            'badges'      => $ev['badges'] ?? null,
             'detail'      => $ev['detail'] ?? null,
         ];
         // Tambahkan data evaluasi jika tipe = evaluasi

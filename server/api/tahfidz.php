@@ -10,8 +10,8 @@
 // GET    ?action=reports&student_id=X     -> riwayat setoran siswa (guru)
 // GET    ?action=my_setoran               -> riwayat setoran sendiri (siswa)
 // GET    ?action=wali_setoran[&student_id=X] -> riwayat setoran anak (orang_tua)
-// POST                                    -> simpan / update setoran
-// DELETE ?id=X                            -> hapus setoran
+// POST                                    -> simpan / update setoran (multi-surah)
+// DELETE ?id=X                            -> hapus setoran (by group_id or single id)
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -101,43 +101,87 @@ function recalcTotalPoints($pdo, $studentId) {
     $grandTotal = 0;
 
     // Shalat points
-    $stmt = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM prayer_logs WHERE student_id = :sid');
-    $stmt->execute(['sid' => $studentId]);
-    $grandTotal += (int) $stmt->fetchColumn();
+    $s = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM prayer_logs WHERE student_id = :sid');
+    $s->execute(['sid' => $studentId]);
+    $grandTotal += (int) $s->fetchColumn();
 
     // Bonus 5/5
-    $stmt = $pdo->prepare(
+    $s = $pdo->prepare(
         "SELECT COUNT(*) FROM (
             SELECT prayer_date FROM prayer_logs
             WHERE student_id = :sid AND status IN ('done','done_jamaah')
             GROUP BY prayer_date HAVING COUNT(DISTINCT prayer_name) >= 5
         ) AS fd"
     );
-    $stmt->execute(['sid' => $studentId]);
-    $grandTotal += (int) $stmt->fetchColumn() * 3;
+    $s->execute(['sid' => $studentId]);
+    $grandTotal += (int) $s->fetchColumn() * 3;
 
-    // Extras
-    $stmt = $pdo->prepare('SELECT COALESCE(SUM(total_extra_points), 0) FROM daily_extras WHERE student_id = :sid');
-    $stmt->execute(['sid' => $studentId]);
-    $grandTotal += (int) $stmt->fetchColumn();
+    // Daily extras
+    $s = $pdo->prepare('SELECT COALESCE(SUM(total_extra_points), 0) FROM daily_extras WHERE student_id = :sid');
+    $s->execute(['sid' => $studentId]);
+    $grandTotal += (int) $s->fetchColumn();
 
     // Public speaking
-    $stmt = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM public_speaking_logs WHERE student_id = :sid');
-    $stmt->execute(['sid' => $studentId]);
-    $grandTotal += (int) $stmt->fetchColumn();
+    $s = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM public_speaking_logs WHERE student_id = :sid');
+    $s->execute(['sid' => $studentId]);
+    $grandTotal += (int) $s->fetchColumn();
 
-    // Kajian
-    $stmt = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM kajian_logs WHERE student_id = :sid');
-    $stmt->execute(['sid' => $studentId]);
-    $grandTotal += (int) $stmt->fetchColumn();
+    // Kajian/diskusi
+    $s = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM kajian_logs WHERE student_id = :sid');
+    $s->execute(['sid' => $studentId]);
+    $grandTotal += (int) $s->fetchColumn();
 
-    // Tahfidz
-    $stmt = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM tahfidz_setoran WHERE student_id = :sid');
-    $stmt->execute(['sid' => $studentId]);
-    $grandTotal += (int) $stmt->fetchColumn();
+    // Tahfidz points
+    $s = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM tahfidz_setoran WHERE student_id = :sid');
+    $s->execute(['sid' => $studentId]);
+    $grandTotal += (int) $s->fetchColumn();
 
     $pdo->prepare('UPDATE students SET total_points = :tp WHERE id = :sid')
         ->execute(['tp' => $grandTotal, 'sid' => $studentId]);
+}
+
+// ── Helper: ensure group_id column exists ──
+function ensureGroupIdColumn($pdo) {
+    try {
+        $pdo->query("SELECT group_id FROM tahfidz_setoran LIMIT 1");
+    } catch (Exception $e) {
+        $pdo->exec("ALTER TABLE tahfidz_setoran ADD COLUMN group_id VARCHAR(36) DEFAULT NULL AFTER target_id");
+        $pdo->exec("CREATE INDEX idx_tahfidz_group ON tahfidz_setoran(group_id)");
+    }
+}
+ensureGroupIdColumn($pdo);
+
+// ── Helper: group setoran rows into reports ──
+function groupSetoran($rows) {
+    $grouped = [];
+    foreach ($rows as $r) {
+        $gid = $r['group_id'] ?? null;
+        $key = $gid ?: ('single_' . $r['id']); // ungrouped rows = own group
+
+        if (!isset($grouped[$key])) {
+            $grouped[$key] = [
+                'id'          => (string) $r['id'],
+                'group_id'    => $gid,
+                'grade'       => $r['grade_letter'] ?? dbToGrade($r['grade']),
+                'grade_label' => $r['grade_label_text'] ?? dbToGradeLabel($r['grade']),
+                'notes'       => $r['notes'] ?? '',
+                'points'      => 0,
+                'guru_name'   => $r['guru_name'] ?? '',
+                'setoran_at'  => $r['setoran_at'],
+                'items'       => [],
+            ];
+        }
+        $grouped[$key]['points'] += (int) $r['points_earned'];
+        $grouped[$key]['items'][] = [
+            'id'           => (string) $r['id'],
+            'surah_number' => (int) $r['surah_number'],
+            'ayat_from'    => (int) $r['ayat_from'],
+            'ayat_to'      => (int) $r['ayat_to'],
+            'grade'        => $r['grade_letter'] ?? dbToGrade($r['grade']),
+            'grade_label'  => $r['grade_label_text'] ?? dbToGradeLabel($r['grade']),
+        ];
+    }
+    return array_values($grouped);
 }
 
 // ════════════════════════════════════════════════════
@@ -296,32 +340,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         try {
             $stmt = $pdo->prepare(
-                'SELECT ts.id, ts.surah_number, ts.ayat_from, ts.ayat_to,
+                'SELECT ts.id, ts.group_id, ts.surah_number, ts.ayat_from, ts.ayat_to,
                         ts.grade, ts.notes, ts.points_earned, ts.setoran_at,
                         u.name AS guru_name
                  FROM tahfidz_setoran ts
                  LEFT JOIN users u ON ts.guru_tahfidz_id = u.id
                  WHERE ts.student_id = :sid
-                 ORDER BY ts.setoran_at DESC'
+                 ORDER BY ts.setoran_at DESC, ts.group_id, ts.id'
             );
             $stmt->execute(['sid' => $studentId]);
             $rows = $stmt->fetchAll();
 
-            $reports = [];
-            foreach ($rows as $r) {
-                $reports[] = [
-                    'id'           => (string) $r['id'],
-                    'surah_number' => (int) $r['surah_number'],
-                    'ayat_from'    => (int) $r['ayat_from'],
-                    'ayat_to'      => (int) $r['ayat_to'],
-                    'grade'        => dbToGrade($r['grade']),
-                    'grade_label'  => dbToGradeLabel($r['grade']),
-                    'notes'        => $r['notes'] ?? '',
-                    'points'       => (int) $r['points_earned'],
-                    'guru_name'    => $r['guru_name'] ?? '',
-                    'setoran_at'   => $r['setoran_at'],
-                ];
-            }
+            $reports = groupSetoran($rows);
 
             echo json_encode(['success' => true, 'data' => $reports]);
         } catch (Exception $e) {
@@ -351,32 +381,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         try {
             $stmt = $pdo->prepare(
-                'SELECT ts.id, ts.surah_number, ts.ayat_from, ts.ayat_to,
+                'SELECT ts.id, ts.group_id, ts.surah_number, ts.ayat_from, ts.ayat_to,
                         ts.grade, ts.notes, ts.points_earned, ts.setoran_at,
                         u.name AS guru_name
                  FROM tahfidz_setoran ts
                  LEFT JOIN users u ON ts.guru_tahfidz_id = u.id
                  WHERE ts.student_id = :sid
-                 ORDER BY ts.setoran_at DESC'
+                 ORDER BY ts.setoran_at DESC, ts.group_id, ts.id'
             );
             $stmt->execute(['sid' => $student['id']]);
             $rows = $stmt->fetchAll();
 
-            $reports = [];
-            foreach ($rows as $r) {
-                $reports[] = [
-                    'id'           => (string) $r['id'],
-                    'surah_number' => (int) $r['surah_number'],
-                    'ayat_from'    => (int) $r['ayat_from'],
-                    'ayat_to'      => (int) $r['ayat_to'],
-                    'grade'        => dbToGrade($r['grade']),
-                    'grade_label'  => dbToGradeLabel($r['grade']),
-                    'notes'        => $r['notes'] ?? '',
-                    'points'       => (int) $r['points_earned'],
-                    'guru_name'    => $r['guru_name'] ?? '',
-                    'setoran_at'   => $r['setoran_at'],
-                ];
-            }
+            $reports = groupSetoran($rows);
 
             echo json_encode(['success' => true, 'data' => $reports]);
         } catch (Exception $e) {
@@ -427,32 +443,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
         try {
             $stmt = $pdo->prepare(
-                'SELECT ts.id, ts.surah_number, ts.ayat_from, ts.ayat_to,
+                'SELECT ts.id, ts.group_id, ts.surah_number, ts.ayat_from, ts.ayat_to,
                         ts.grade, ts.notes, ts.points_earned, ts.setoran_at,
                         u.name AS guru_name
                  FROM tahfidz_setoran ts
                  LEFT JOIN users u ON ts.guru_tahfidz_id = u.id
                  WHERE ts.student_id = :sid
-                 ORDER BY ts.setoran_at DESC'
+                 ORDER BY ts.setoran_at DESC, ts.group_id, ts.id'
             );
             $stmt->execute(['sid' => $studentId]);
             $rows = $stmt->fetchAll();
 
-            $reports = [];
-            foreach ($rows as $r) {
-                $reports[] = [
-                    'id'           => (string) $r['id'],
-                    'surah_number' => (int) $r['surah_number'],
-                    'ayat_from'    => (int) $r['ayat_from'],
-                    'ayat_to'      => (int) $r['ayat_to'],
-                    'grade'        => dbToGrade($r['grade']),
-                    'grade_label'  => dbToGradeLabel($r['grade']),
-                    'notes'        => $r['notes'] ?? '',
-                    'points'       => (int) $r['points_earned'],
-                    'guru_name'    => $r['guru_name'] ?? '',
-                    'setoran_at'   => $r['setoran_at'],
-                ];
-            }
+            $reports = groupSetoran($rows);
 
             echo json_encode(['success' => true, 'data' => $reports]);
         } catch (Exception $e) {
@@ -485,18 +487,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $noteId      = $input['id'] ?? null;
-    $studentId   = $input['student_id'] ?? null;
-    $surahNumber = $input['surah_number'] ?? null;
-    $ayatFrom    = $input['ayat_from'] ?? null;
-    $ayatTo      = $input['ayat_to'] ?? null;
-    $grade       = $input['grade'] ?? 'C';
-    $notes       = $input['notes'] ?? '';
+    $noteId    = $input['id'] ?? null;
+    $groupId   = $input['group_id'] ?? null;
+    $studentId = $input['student_id'] ?? null;
+    $grade     = $input['grade'] ?? 'C';
+    $notes     = $input['notes'] ?? '';
 
-    // Validasi
-    if (!$studentId || !$surahNumber || !$ayatFrom || !$ayatTo) {
+    // Multi-surah: accept "surahs" array, OR legacy single surah fields
+    $surahs = $input['surahs'] ?? null;
+    if (!$surahs) {
+        // Backward compat: single surah
+        $sn = $input['surah_number'] ?? null;
+        $af = $input['ayat_from'] ?? null;
+        $at = $input['ayat_to'] ?? null;
+        if ($sn && $af && $at) {
+            $surahs = [['surah_number' => $sn, 'ayat_from' => $af, 'ayat_to' => $at]];
+        }
+    }
+
+    if (!$studentId || !$surahs || empty($surahs)) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'student_id, surah_number, ayat_from, ayat_to wajib diisi']);
+        echo json_encode(['success' => false, 'message' => 'student_id dan minimal 1 surah wajib diisi']);
         exit;
     }
 
@@ -505,125 +516,158 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
-        if ($noteId) {
-            // ── Update ──
-            $check = $pdo->prepare('SELECT id FROM tahfidz_setoran WHERE id = :id AND student_id = :sid');
-            $check->execute(['id' => $noteId, 'sid' => $studentId]);
-            if (!$check->fetch()) {
-                $pdo->rollBack();
-                http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Setoran tidak ditemukan']);
-                exit;
+        if ($noteId || $groupId) {
+            // ── Update existing report ──
+            // Delete old rows by group_id (or single id), then re-insert
+            if ($groupId) {
+                $pdo->prepare('DELETE FROM tahfidz_setoran WHERE group_id = :gid AND student_id = :sid')
+                    ->execute(['gid' => $groupId, 'sid' => $studentId]);
+            } elseif ($noteId) {
+                $pdo->prepare('DELETE FROM tahfidz_setoran WHERE id = :id AND student_id = :sid')
+                    ->execute(['id' => $noteId, 'sid' => $studentId]);
             }
 
-            $stmt = $pdo->prepare(
-                'UPDATE tahfidz_setoran
-                 SET surah_number = :sn, ayat_from = :af, ayat_to = :at,
-                     grade = :g, notes = :n
-                 WHERE id = :id AND student_id = :sid'
-            );
-            $stmt->execute([
-                'sn'  => $surahNumber,
-                'af'  => $ayatFrom,
-                'at'  => $ayatTo,
-                'g'   => $dbGrade,
-                'n'   => $notes,
-                'id'  => $noteId,
-                'sid' => $studentId,
+            // Re-insert with same group_id (or generate new one)
+            $newGroupId = $groupId ?: bin2hex(random_bytes(18));
+            $resultIds = [];
+            $isFirstItem = true;
+
+            foreach ($surahs as $s) {
+                $sn = $s['surah_number'];
+                $af = $s['ayat_from'];
+                $at = $s['ayat_to'];
+
+                // Ensure target exists
+                $stmtTarget = $pdo->prepare(
+                    'SELECT id FROM tahfidz_targets
+                     WHERE student_id = :sid AND guru_tahfidz_id = :gid AND surah_number = :sn LIMIT 1'
+                );
+                $stmtTarget->execute(['sid' => $studentId, 'gid' => $userId, 'sn' => $sn]);
+                $target = $stmtTarget->fetch();
+                if (!$target) {
+                    $pdo->prepare(
+                        'INSERT INTO tahfidz_targets (student_id, guru_tahfidz_id, surah_number, start_ayat, end_ayat, status)
+                         VALUES (:sid, :gid, :sn, :sa, :ea, :st)'
+                    )->execute(['sid' => $studentId, 'gid' => $userId, 'sn' => $sn, 'sa' => $af, 'ea' => $at, 'st' => 'setor']);
+                    $targetId = $pdo->lastInsertId();
+                } else {
+                    $targetId = $target['id'];
+                }
+
+                // 1 laporan = 5 point (hanya di baris pertama)
+                $pts = $isFirstItem ? 5 : 0;
+                $isFirstItem = false;
+
+                // Per-surah grade (fallback ke grade global)
+                $itemGrade = isset($s['grade']) ? gradeToDb($s['grade']) : $dbGrade;
+
+                $pdo->prepare(
+                    'INSERT INTO tahfidz_setoran
+                        (target_id, group_id, student_id, guru_tahfidz_id, surah_number, ayat_from, ayat_to, grade, notes, points_earned)
+                     VALUES (:tid, :gid, :sid, :uid, :sn, :af, :at, :g, :n, :pts)'
+                )->execute([
+                    'tid' => $targetId, 'gid' => $newGroupId, 'sid' => $studentId,
+                    'uid' => $userId, 'sn' => $sn, 'af' => $af, 'at' => $at,
+                    'g' => $itemGrade, 'n' => $notes, 'pts' => $pts,
+                ]);
+                $resultIds[] = $pdo->lastInsertId();
+            }
+
+            recalcTotalPoints($pdo, (int) $studentId);
+            $pdo->commit();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Setoran diperbarui',
+                'data'    => ['id' => (string) $resultIds[0], 'group_id' => $newGroupId],
             ]);
-            $resultId = $noteId;
         } else {
             // ── Insert baru ──
+            $newGroupId = count($surahs) > 1 ? bin2hex(random_bytes(18)) : null;
+            $resultIds = [];
+            $isFirstItem = true;
 
-            // Pastikan ada target (FK constraint)
-            $stmtTarget = $pdo->prepare(
-                'SELECT id FROM tahfidz_targets
-                 WHERE student_id = :sid AND guru_tahfidz_id = :gid
-                   AND surah_number = :sn
-                 LIMIT 1'
-            );
-            $stmtTarget->execute([
-                'sid' => $studentId,
-                'gid' => $userId,
-                'sn'  => $surahNumber,
-            ]);
-            $target = $stmtTarget->fetch();
+            foreach ($surahs as $s) {
+                $sn = $s['surah_number'];
+                $af = $s['ayat_from'];
+                $at = $s['ayat_to'];
 
-            if (!$target) {
-                // Auto-create target
+                // Pastikan ada target (FK constraint)
+                $stmtTarget = $pdo->prepare(
+                    'SELECT id FROM tahfidz_targets
+                     WHERE student_id = :sid AND guru_tahfidz_id = :gid AND surah_number = :sn LIMIT 1'
+                );
+                $stmtTarget->execute(['sid' => $studentId, 'gid' => $userId, 'sn' => $sn]);
+                $target = $stmtTarget->fetch();
+
+                if (!$target) {
+                    $pdo->prepare(
+                        'INSERT INTO tahfidz_targets (student_id, guru_tahfidz_id, surah_number, start_ayat, end_ayat, status)
+                         VALUES (:sid, :gid, :sn, :sa, :ea, :st)'
+                    )->execute(['sid' => $studentId, 'gid' => $userId, 'sn' => $sn, 'sa' => $af, 'ea' => $at, 'st' => 'setor']);
+                    $targetId = $pdo->lastInsertId();
+                } else {
+                    $targetId = $target['id'];
+                    $pdo->prepare('UPDATE tahfidz_targets SET status = :st WHERE id = :id')
+                        ->execute(['st' => 'setor', 'id' => $targetId]);
+                }
+
+                // 1 laporan = 5 point (hanya di baris pertama, sisanya 0)
+                $pts = $isFirstItem ? 5 : 0;
+                $isFirstItem = false;
+
+                // Per-surah grade (fallback ke grade global)
+                $itemGrade = isset($s['grade']) ? gradeToDb($s['grade']) : $dbGrade;
+
                 $pdo->prepare(
-                    'INSERT INTO tahfidz_targets (student_id, guru_tahfidz_id, surah_number, start_ayat, end_ayat, status)
-                     VALUES (:sid, :gid, :sn, :sa, :ea, :st)'
+                    'INSERT INTO tahfidz_setoran
+                        (target_id, group_id, student_id, guru_tahfidz_id, surah_number, ayat_from, ayat_to, grade, notes, points_earned)
+                     VALUES (:tid, :gid, :sid, :uid, :sn, :af, :at, :g, :n, :pts)'
                 )->execute([
-                    'sid' => $studentId,
-                    'gid' => $userId,
-                    'sn'  => $surahNumber,
-                    'sa'  => $ayatFrom,
-                    'ea'  => $ayatTo,
-                    'st'  => 'setor',
+                    'tid' => $targetId, 'gid' => $newGroupId, 'sid' => $studentId,
+                    'uid' => $userId, 'sn' => $sn, 'af' => $af, 'at' => $at,
+                    'g' => $itemGrade, 'n' => $notes, 'pts' => $pts,
                 ]);
-                $targetId = $pdo->lastInsertId();
-            } else {
-                $targetId = $target['id'];
-                // Update target status
-                $pdo->prepare('UPDATE tahfidz_targets SET status = :st WHERE id = :id')
-                    ->execute(['st' => 'setor', 'id' => $targetId]);
+                $rid = $pdo->lastInsertId();
+                $resultIds[] = $rid;
             }
 
-            $points = 5; // Poin per setoran
-
-            $stmt = $pdo->prepare(
-                'INSERT INTO tahfidz_setoran
-                    (target_id, student_id, guru_tahfidz_id, surah_number, ayat_from, ayat_to, grade, notes, points_earned)
-                 VALUES (:tid, :sid, :gid, :sn, :af, :at, :g, :n, :pts)'
-            );
-            $stmt->execute([
-                'tid' => $targetId,
-                'sid' => $studentId,
-                'gid' => $userId,
-                'sn'  => $surahNumber,
-                'af'  => $ayatFrom,
-                'at'  => $ayatTo,
-                'g'   => $dbGrade,
-                'n'   => $notes,
-                'pts' => $points,
-            ]);
-            $resultId = $pdo->lastInsertId();
-
-            // Recalculate total points
-            recalcTotalPoints($pdo, (int) $studentId);
-
-            // Log poin
+            // Log poin 1x per laporan (bukan per surah)
+            $firstSn = $surahs[0]['surah_number'];
+            $desc = count($surahs) > 1
+                ? 'Setoran Tahfidz: ' . count($surahs) . ' surah'
+                : "Setoran Tahfidz: Surah {$firstSn} ayat {$surahs[0]['ayat_from']}-{$surahs[0]['ayat_to']}";
             $pdo->prepare(
                 'INSERT INTO points_log (student_id, source, source_id, points, description)
                  VALUES (:sid, :src, :srcid, :pts, :desc)'
             )->execute([
-                'sid'   => $studentId,
-                'src'   => 'tahfidz',
-                'srcid' => $resultId,
-                'pts'   => $points,
-                'desc'  => "Setoran Tahfidz: Surah {$surahNumber} ayat {$ayatFrom}-{$ayatTo}",
+                'sid' => $studentId, 'src' => 'tahfidz', 'srcid' => $resultIds[0],
+                'pts' => 5, 'desc' => $desc,
+            ]);
+
+            recalcTotalPoints($pdo, (int) $studentId);
+            $pdo->commit();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Setoran disimpan',
+                'data'    => ['id' => (string) $resultIds[0], 'group_id' => $newGroupId],
             ]);
         }
-
-        $pdo->commit();
-
-        echo json_encode([
-            'success' => true,
-            'message' => $noteId ? 'Setoran diperbarui' : 'Setoran disimpan',
-            'data'    => ['id' => (string) $resultId],
-        ]);
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Gagal menyimpan setoran']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Gagal menyimpan setoran: ' . $e->getMessage(),
+        ]);
     }
     exit;
 }
 
 // ════════════════════════════════════════════════════
 // DELETE: Hapus setoran
-// Query param: id=<setoran_id>
+// Query param: id=<setoran_id> OR group_id=<group_id>
 // ════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     if (!in_array($user['role'], ['guru_kelas', 'guru_tahfidz'])) {
@@ -632,50 +676,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         exit;
     }
 
-    $noteId = $_GET['id'] ?? null;
-    if (!$noteId) {
+    $noteId  = $_GET['id'] ?? null;
+    $groupId = $_GET['group_id'] ?? null;
+
+    if (!$noteId && !$groupId) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Parameter id diperlukan']);
+        echo json_encode(['success' => false, 'message' => 'Parameter id atau group_id diperlukan']);
         exit;
     }
 
     try {
-        $check = $pdo->prepare('SELECT id, student_id, points_earned FROM tahfidz_setoran WHERE id = :id');
-        $check->execute(['id' => $noteId]);
-        $row = $check->fetch();
+        // Collect rows to delete
+        if ($groupId) {
+            $check = $pdo->prepare('SELECT id, student_id, points_earned, group_id FROM tahfidz_setoran WHERE group_id = :gid');
+            $check->execute(['gid' => $groupId]);
+        } else {
+            // Check if this row has a group_id — if so, delete all in group
+            $check = $pdo->prepare('SELECT id, student_id, points_earned, group_id FROM tahfidz_setoran WHERE id = :id');
+            $check->execute(['id' => $noteId]);
+        }
+        $rows = $check->fetchAll();
 
-        if (!$row) {
+        if (empty($rows)) {
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'Setoran tidak ditemukan']);
             exit;
         }
 
-        $studentId    = (int) $row['student_id'];
-        $earnedPoints = (int) $row['points_earned'];
+        // If the first row has a group_id and we queried by id, get all group rows
+        $firstRow = $rows[0];
+        if (!$groupId && $firstRow['group_id']) {
+            $check2 = $pdo->prepare('SELECT id, student_id, points_earned, group_id FROM tahfidz_setoran WHERE group_id = :gid');
+            $check2->execute(['gid' => $firstRow['group_id']]);
+            $rows = $check2->fetchAll();
+        }
+
+        $studentId    = (int) $firstRow['student_id'];
+        $totalEarned  = 0;
 
         $pdo->beginTransaction();
 
-        $pdo->prepare('DELETE FROM tahfidz_setoran WHERE id = :id')->execute(['id' => $noteId]);
+        foreach ($rows as $row) {
+            $totalEarned += (int) $row['points_earned'];
+            $pdo->prepare('DELETE FROM tahfidz_setoran WHERE id = :id')->execute(['id' => $row['id']]);
+        }
 
-        // Recalculate total points
         recalcTotalPoints($pdo, $studentId);
 
-        // Log negative points
-        if ($earnedPoints > 0) {
+        if ($totalEarned > 0) {
             $pdo->prepare(
                 'INSERT INTO points_log (student_id, source, source_id, points, description)
                  VALUES (:sid, :src, :srcid, :pts, :desc)'
             )->execute([
                 'sid'   => $studentId,
                 'src'   => 'tahfidz',
-                'srcid' => $noteId,
-                'pts'   => -$earnedPoints,
+                'srcid' => $firstRow['id'],
+                'pts'   => -$totalEarned,
                 'desc'  => 'Hapus setoran oleh guru',
             ]);
         }
 
         $pdo->commit();
-
         echo json_encode(['success' => true, 'message' => 'Setoran dihapus']);
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();

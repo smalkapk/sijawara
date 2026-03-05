@@ -112,6 +112,126 @@ try {
     }
 
     // ══════════════════════════════════════
+    // 2b. POIN BULANAN (Jan - Des tahun ini)
+    // Ambil langsung dari tabel sumber (bukan points_log yang unreliable)
+    // ══════════════════════════════════════
+    $currentYear = date('Y');
+    $monthlyPoints = [];
+
+    for ($m = 1; $m <= 12; $m++) {
+        $startDate = sprintf('%s-%02d-01', $currentYear, $m);
+        $endDate = date('Y-m-t', strtotime($startDate)); // last day of month
+        $mPoints = 0;
+
+        // 1) Shalat points (from prayer_logs)
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points_earned), 0)
+             FROM prayer_logs
+             WHERE student_id = :sid
+               AND prayer_date BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 2) Bonus 5/5 shalat per bulan ini
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM (
+                SELECT prayer_date FROM prayer_logs
+                WHERE student_id = :sid
+                  AND prayer_date BETWEEN :d1 AND :d2
+                  AND status IN ('done','done_jamaah')
+                GROUP BY prayer_date
+                HAVING COUNT(DISTINCT prayer_name) >= 5
+            ) AS fd"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn() * 3;
+
+        // 3) Daily extras (bangun pagi, kebaikan, combo)
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(total_extra_points), 0)
+             FROM daily_extras
+             WHERE student_id = :sid
+               AND log_date BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 4) Public speaking
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points_earned), 0)
+             FROM public_speaking_logs
+             WHERE student_id = :sid
+               AND speaking_date BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 5) Kajian/diskusi
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points_earned), 0)
+             FROM kajian_logs
+             WHERE student_id = :sid
+               AND kajian_date BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 6) Tahfidz setoran
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points_earned), 0)
+             FROM tahfidz_setoran
+             WHERE student_id = :sid
+               AND DATE(setoran_at) BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 7) Al-Qur'an reading
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points_earned), 0)
+             FROM quran_reading_logs
+             WHERE student_id = :sid
+               AND DATE(read_at) BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 8) Puasa sunnah
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points_earned), 0)
+             FROM fasting_logs
+             WHERE student_id = :sid
+               AND fasting_date BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 9) Sedekah
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points_earned), 0)
+             FROM charity_logs
+             WHERE student_id = :sid
+               AND charity_date BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        // 10) Jurnal (dari points_log karena tabel journals tidak punya points_earned)
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(points), 0)
+             FROM points_log
+             WHERE student_id = :sid
+               AND source = 'jurnal'
+               AND DATE(earned_at) BETWEEN :d1 AND :d2"
+        );
+        $stmt->execute(['sid' => $studentId, 'd1' => $startDate, 'd2' => $endDate]);
+        $mPoints += (int) $stmt->fetchColumn();
+
+        $monthlyPoints[] = $mPoints;
+    }
+
+    // ══════════════════════════════════════
     // 3. RINCIAN POIN PER SUMBER
     // ══════════════════════════════════════
     $sources = [
@@ -339,6 +459,7 @@ try {
             ],
             'weekly_points' => $weeklyPoints,
             'day_labels'    => $dayLabels,
+            'monthly_points' => $monthlyPoints,
             'points_breakdown' => $pointsBreakdown,
             'badges'        => $badgesResponse,
             'new_badges'    => $newBadges, // badge baru yg baru di-award saat ini

@@ -63,6 +63,11 @@ try {
         $s->execute(['sid' => $sid]);
         $grandTotal += (int) $s->fetchColumn();
 
+        // Tahfidz setoran
+        $s = $pdo->prepare('SELECT COALESCE(SUM(points_earned), 0) FROM tahfidz_setoran WHERE student_id = :sid');
+        $s->execute(['sid' => $sid]);
+        $grandTotal += (int) $s->fetchColumn();
+
         // Update
         $pdo->prepare('UPDATE students SET total_points = :tp WHERE id = :sid')
             ->execute(['tp' => $grandTotal, 'sid' => $sid]);

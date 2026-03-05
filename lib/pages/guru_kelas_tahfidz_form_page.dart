@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../services/tahfidz_service.dart';
+import 'quran_page.dart' show allSurahs;
 
 class GuruKelasTahfidzFormPage extends StatefulWidget {
   final bool isEditing;
@@ -23,32 +24,95 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
   final _ayatFromController = TextEditingController();
   final _ayatToController = TextEditingController();
   final _noteController = TextEditingController();
+  final FocusNode _ayatToFocusNode = FocusNode();
   String _selectedGrade = 'A';
   int? _selectedSurahNumber;
   bool _isSaving = false;
 
+  // Multi-surah items
+  final List<SetoranItem> _surahItems = [];
+  bool get _isMultiSurahMode => _surahItems.isNotEmpty;
+
   final List<String> _gradeOptions = ['A', 'B+', 'B', 'C', 'D'];
+
+  /// Get max ayat count for the currently selected surah
+  int? get _maxAyat {
+    if (_selectedSurahNumber == null) return null;
+    try {
+      final surah = allSurahs.firstWhere((s) => s.number == _selectedSurahNumber);
+      return surah.ayatCount;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Validate and clamp ayatTo to the max ayat count
+  void _validateAyatTo() {
+    final max = _maxAyat;
+    if (max == null) return;
+    final val = int.tryParse(_ayatToController.text.trim());
+    if (val != null && val > max) {
+      _ayatToController.text = max.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ayat sampai disesuaikan ke $max (ayat maksimal surat ini)'),
+          backgroundColor: AppTheme.gold,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _ayatToFocusNode.addListener(() {
+      if (!_ayatToFocusNode.hasFocus) {
+        _validateAyatTo();
+      }
+    });
     if (widget.isEditing && widget.initialData != null) {
-      _surahController.text = widget.initialData!['last_surah'] ?? '';
-      _selectedSurahNumber = widget.initialData!['surah_number'] as int?;
       _selectedGrade = widget.initialData!['grade'] ?? 'A';
       _noteController.text = widget.initialData!['note'] ?? '';
 
-      // Ayat: parse from separate fields or "from-to" string
-      if (widget.initialData!['ayat_from'] != null) {
-        _ayatFromController.text =
-            widget.initialData!['ayat_from'].toString();
-        _ayatToController.text =
-            widget.initialData!['ayat_to'].toString();
-      } else if (widget.initialData!['ayat'] != null) {
-        final parts = widget.initialData!['ayat'].toString().split('-');
-        if (parts.length == 2) {
-          _ayatFromController.text = parts[0].trim();
-          _ayatToController.text = parts[1].trim();
+      // Multi-surah editing: populate _surahItems from items list
+      final items = widget.initialData!['items'];
+      if (items != null && items is List && items.length > 1) {
+        _surahItems.addAll(
+          items.map((e) => SetoranItem.fromJson(e as Map<String, dynamic>)),
+        );
+      } else if (items != null && items is List && items.length == 1) {
+        // Single-surah editing with per-item grade
+        final item = items[0] as Map<String, dynamic>;
+        _surahController.text = surahNames[item['surah_number'] is int
+            ? item['surah_number']
+            : int.parse(item['surah_number'].toString())] ?? '';
+        _selectedSurahNumber = item['surah_number'] is int
+            ? item['surah_number']
+            : int.parse(item['surah_number'].toString());
+        _ayatFromController.text = item['ayat_from'].toString();
+        _ayatToController.text = item['ayat_to'].toString();
+        if (item['grade'] != null && (item['grade'] as String).isNotEmpty) {
+          _selectedGrade = item['grade'] as String;
+        }
+      } else {
+        // Legacy: no items array
+        _surahController.text = widget.initialData!['last_surah'] ?? '';
+        _selectedSurahNumber = widget.initialData!['surah_number'] as int?;
+
+        if (widget.initialData!['ayat_from'] != null) {
+          _ayatFromController.text =
+              widget.initialData!['ayat_from'].toString();
+          _ayatToController.text =
+              widget.initialData!['ayat_to'].toString();
+        } else if (widget.initialData!['ayat'] != null) {
+          final parts = widget.initialData!['ayat'].toString().split('-');
+          if (parts.length == 2) {
+            _ayatFromController.text = parts[0].trim();
+            _ayatToController.text = parts[1].trim();
+          }
         }
       }
     }
@@ -59,6 +123,7 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
     _surahController.dispose();
     _ayatFromController.dispose();
     _ayatToController.dispose();
+    _ayatToFocusNode.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -66,36 +131,46 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
   Future<void> _saveForm() async {
     HapticFeedback.mediumImpact();
 
-    // Validasi surah
-    int? surahNum = _selectedSurahNumber;
-    surahNum ??= findSurahNumber(_surahController.text);
-    if (surahNum == null || _surahController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Nama surah tidak dikenali'),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      return;
-    }
+    // Build surahs list from multi-surah items or single fields
+    List<SetoranItem> surahs;
 
-    // Validasi ayat
-    final ayatFrom = int.tryParse(_ayatFromController.text.trim());
-    final ayatTo = int.tryParse(_ayatToController.text.trim());
-    if (ayatFrom == null || ayatTo == null || ayatFrom <= 0 || ayatTo <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Ayat dari dan sampai harus diisi angka'),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      return;
+    if (_isMultiSurahMode) {
+      surahs = List.from(_surahItems);
+    } else {
+      // Single-surah: validate surah + ayat fields
+      int? surahNum = _selectedSurahNumber;
+      surahNum ??= findSurahNumber(_surahController.text);
+      if (surahNum == null || _surahController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Nama surah tidak dikenali'),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        return;
+      }
+
+      _validateAyatTo();
+
+      final ayatFrom = int.tryParse(_ayatFromController.text.trim());
+      final ayatTo = int.tryParse(_ayatToController.text.trim());
+      if (ayatFrom == null || ayatTo == null || ayatFrom <= 0 || ayatTo <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Ayat dari dan sampai harus diisi angka'),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        return;
+      }
+
+      surahs = [SetoranItem(surahNumber: surahNum, ayatFrom: ayatFrom, ayatTo: ayatTo, grade: _selectedGrade)];
     }
 
     final studentId = widget.initialData?['student_id'];
@@ -130,19 +205,16 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
       if (widget.isEditing && widget.initialData?['id'] != null) {
         await TahfidzService.updateSetoran(
           id: widget.initialData!['id'].toString(),
+          groupId: widget.initialData!['group_id']?.toString(),
           studentId: sid,
-          surahNumber: surahNum,
-          ayatFrom: ayatFrom,
-          ayatTo: ayatTo,
+          surahs: surahs,
           grade: _selectedGrade,
           notes: _noteController.text.trim(),
         );
       } else {
         await TahfidzService.addSetoran(
           studentId: sid,
-          surahNumber: surahNum,
-          ayatFrom: ayatFrom,
-          ayatTo: ayatTo,
+          surahs: surahs,
           grade: _selectedGrade,
           notes: _noteController.text.trim(),
         );
@@ -198,42 +270,71 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSurahAutocomplete(),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildInputField(
-                            'Ayat Dari',
-                            _ayatFromController,
-                            Icons.numbers_rounded,
-                            keyboardType: TextInputType.number,
-                          ),
+                    // ── Multi-surah cards (when items exist) ──
+                    if (_isMultiSurahMode) ...[
+                      const Text(
+                        'Surah yang disetorkan',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildInputField(
-                            'Ayat Sampai',
-                            _ayatToController,
-                            Icons.numbers_rounded,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    const Text(
-                      'Predikat Nilai',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildGradeSelector(),
+                      const SizedBox(height: 8),
+                      ..._surahItems.asMap().entries.map(
+                        (entry) => _buildSurahItemCard(entry.key, entry.value),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // ── Single-surah fields (when no items) ──
+                    if (!_isMultiSurahMode) ...[
+                      _buildSurahAutocomplete(),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildInputField(
+                              'Ayat Dari',
+                              _ayatFromController,
+                              Icons.numbers_rounded,
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildInputField(
+                              'Ayat Sampai',
+                              _ayatToController,
+                              Icons.numbers_rounded,
+                              keyboardType: TextInputType.number,
+                              focusNode: _ayatToFocusNode,
+                              hintSuffix: _maxAyat != null ? ' (maks $_maxAyat)' : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // ── Tambah Surah button ──
+                    _buildAddSurahButton(),
                     const SizedBox(height: 16),
+
+                    // ── Grade selector: hanya tampil di single-surah mode ──
+                    if (!_isMultiSurahMode) ...[
+                      const Text(
+                        'Predikat Nilai',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildGradeSelector(),
+                      const SizedBox(height: 16),
+                    ],
 
                     _buildInputField('Catatan Guru', _noteController, Icons.notes_rounded, maxLines: 5),
 
@@ -323,7 +424,12 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
     IconData icon, {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    FocusNode? focusNode,
+    String? hintSuffix,
   }) {
+    final hintText = hintSuffix != null
+        ? 'Masukkan $label...$hintSuffix'
+        : 'Masukkan $label...';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -361,10 +467,11 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   maxLines: maxLines,
                   keyboardType: keyboardType,
                   decoration: InputDecoration(
-                    hintText: 'Masukkan $label...',
+                    hintText: hintText,
                     hintStyle: TextStyle(
                       fontSize: 14,
                       color: AppTheme.grey400,
@@ -410,6 +517,8 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
           onSelected: (option) {
             _selectedSurahNumber = option.key;
             _surahController.text = option.value;
+            setState(() {});
+            _validateAyatTo();
           },
           fieldViewBuilder:
               (context, textController, focusNode, onFieldSubmitted) {
@@ -444,7 +553,8 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
                       focusNode: focusNode,
                       onChanged: (val) {
                         _surahController.text = val;
-                        _selectedSurahNumber = null;
+                        _selectedSurahNumber = findSurahNumber(val);
+                        setState(() {});
                       },
                       decoration: InputDecoration(
                         hintText: 'Cari nama surah...',
@@ -494,6 +604,579 @@ class _GuruKelasTahfidzFormPageState extends State<GuruKelasTahfidzFormPage> {
           },
         ),
       ],
+    );
+  }
+
+  // ── Grade color helper ──
+  Color _gradeColor(String grade) {
+    switch (grade) {
+      case 'A':  return const Color(0xFF7C3AED);
+      case 'B+': return const Color(0xFF3B82F6);
+      case 'B':  return const Color(0xFF059669);
+      case 'C':  return const Color(0xFFF59E0B);
+      case 'D':  return const Color(0xFFEF4444);
+      default:   return AppTheme.grey400;
+    }
+  }
+
+  // ── Multi-surah: item card (tappable to edit) ──
+  Widget _buildSurahItemCard(int index, SetoranItem item) {
+    final gColor = _gradeColor(item.grade);
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _showEditSurahBottomSheet(index, item);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.menu_book_rounded,
+                  color: AppTheme.primaryGreen, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.surahName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Ayat ${item.ayatFrom} - ${item.ayatTo}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.grey400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Grade badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: gColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: gColor.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                item.grade,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: gColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() => _surahItems.removeAt(index));
+              },
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.close_rounded,
+                    color: Colors.red.shade400, size: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── "Tambah Surah" button ──
+  Widget _buildAddSurahButton() {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        // If single-surah fields have values, convert to item first
+        if (!_isMultiSurahMode) {
+          final surahNum =
+              _selectedSurahNumber ?? findSurahNumber(_surahController.text);
+          final ayatFrom = int.tryParse(_ayatFromController.text.trim());
+          final ayatTo = int.tryParse(_ayatToController.text.trim());
+          if (surahNum != null &&
+              ayatFrom != null &&
+              ayatTo != null &&
+              ayatFrom > 0 &&
+              ayatTo > 0) {
+            setState(() {
+              _surahItems.add(SetoranItem(
+                surahNumber: surahNum,
+                ayatFrom: ayatFrom,
+                ayatTo: ayatTo,
+                grade: _selectedGrade,
+              ));
+              _surahController.clear();
+              _ayatFromController.clear();
+              _ayatToController.clear();
+              _selectedSurahNumber = null;
+            });
+          }
+        }
+        _showAddSurahBottomSheet();
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryGreen.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_rounded,
+                color: AppTheme.primaryGreen, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              _isMultiSurahMode ? 'Tambah Surah Lain' : 'Tambah Surah',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.primaryGreen,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Grade mini selector for bottom sheets ──
+  Widget _buildGradeMiniSelector(String selected, void Function(String) onSelect, void Function(VoidCallback) setSheet) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Predikat Nilai',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _gradeOptions.map((grade) {
+            final isSelected = selected == grade;
+            final gColor = _gradeColor(grade);
+            return GestureDetector(
+              onTap: () {
+                setSheet(() => onSelect(grade));
+                HapticFeedback.selectionClick();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                decoration: BoxDecoration(
+                  color: isSelected ? gColor : AppTheme.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: isSelected ? gColor : AppTheme.grey200, width: 1),
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: gColor.withValues(alpha: 0.3), blurRadius: 6, offset: const Offset(0, 2))]
+                      : null,
+                ),
+                child: Text(
+                  grade,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: isSelected ? Colors.white : AppTheme.grey600),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // ── Bottom sheet for adding a surah item ──
+  void _showAddSurahBottomSheet() {
+    final bsSurahController = TextEditingController();
+    final bsAyatFromController = TextEditingController();
+    final bsAyatToController = TextEditingController();
+    int? bsSelectedSurahNumber;
+    String bsGrade = _surahItems.isNotEmpty ? _surahItems.last.grade : _selectedGrade;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            int? bsMaxAyat;
+            if (bsSelectedSurahNumber != null) {
+              try {
+                final surah = allSurahs.firstWhere((s) => s.number == bsSelectedSurahNumber);
+                bsMaxAyat = surah.ayatCount;
+              } catch (_) {}
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppTheme.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+                      const SizedBox(height: 16),
+                      const Text('Tambah Surah', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                      const SizedBox(height: 16),
+
+                      const Text('Nama Surah', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                      const SizedBox(height: 6),
+                      Autocomplete<MapEntry<int, String>>(
+                        optionsBuilder: (textEditingValue) {
+                          final q = textEditingValue.text.toLowerCase().trim();
+                          if (q.isEmpty) return surahNames.entries;
+                          return surahNames.entries.where(
+                            (e) => e.value.toLowerCase().contains(q) || e.key.toString() == q,
+                          );
+                        },
+                        displayStringForOption: (opt) => opt.value,
+                        onSelected: (opt) {
+                          bsSurahController.text = opt.value;
+                          bsSelectedSurahNumber = opt.key;
+                          setModalState(() {});
+                        },
+                        fieldViewBuilder: (ctx2, textController, focusNode, onFieldSubmitted) {
+                          return Container(
+                            decoration: BoxDecoration(color: AppTheme.bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.grey100, width: 1)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.menu_book_rounded, color: AppTheme.primaryGreen, size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: textController,
+                                    focusNode: focusNode,
+                                    onChanged: (val) {
+                                      bsSurahController.text = val;
+                                      bsSelectedSurahNumber = findSurahNumber(val);
+                                      setModalState(() {});
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'Cari nama surah...',
+                                      hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey400),
+                                      border: InputBorder.none, isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        optionsViewBuilder: (ctx2, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 4, borderRadius: BorderRadius.circular(12),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 180),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero, shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (ctx3, index) {
+                                    final opt = options.elementAt(index);
+                                    return ListTile(dense: true, title: Text('${opt.key}. ${opt.value}', style: const TextStyle(fontSize: 13)), onTap: () => onSelected(opt));
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('Ayat Dari', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(color: AppTheme.bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.grey100, width: 1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                              child: TextField(controller: bsAyatFromController, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Dari...', hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey400), border: InputBorder.none, isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 14))),
+                            ),
+                          ])),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(bsMaxAyat != null ? 'Ayat Sampai (maks $bsMaxAyat)' : 'Ayat Sampai', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(color: AppTheme.bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.grey100, width: 1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                              child: TextField(controller: bsAyatToController, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Sampai...', hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey400), border: InputBorder.none, isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 14))),
+                            ),
+                          ])),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildGradeMiniSelector(bsGrade, (g) => bsGrade = g, setModalState),
+                      const SizedBox(height: 20),
+
+                      GestureDetector(
+                        onTap: () {
+                          final sNum = bsSelectedSurahNumber ?? findSurahNumber(bsSurahController.text);
+                          final aFrom = int.tryParse(bsAyatFromController.text.trim());
+                          var aTo = int.tryParse(bsAyatToController.text.trim());
+                          if (sNum == null || bsSurahController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Pilih surah terlebih dahulu'), backgroundColor: Colors.red.shade400, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                            return;
+                          }
+                          if (aFrom == null || aTo == null || aFrom <= 0 || aTo <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Ayat dari dan sampai harus diisi'), backgroundColor: Colors.red.shade400, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                            return;
+                          }
+                          if (bsMaxAyat != null && aTo > bsMaxAyat) aTo = bsMaxAyat;
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _surahItems.add(SetoranItem(surahNumber: sNum, ayatFrom: aFrom, ayatTo: aTo!, grade: bsGrade));
+                          });
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(gradient: AppTheme.mainGradient, borderRadius: BorderRadius.circular(AppTheme.radiusMd), boxShadow: AppTheme.greenGlow),
+                          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('Tambah', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                          ]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Bottom sheet for editing an existing surah item ──
+  void _showEditSurahBottomSheet(int index, SetoranItem item) {
+    final bsSurahController = TextEditingController(text: item.surahName);
+    final bsAyatFromController = TextEditingController(text: item.ayatFrom.toString());
+    final bsAyatToController = TextEditingController(text: item.ayatTo.toString());
+    int? bsSelectedSurahNumber = item.surahNumber;
+    String bsGrade = item.grade.isNotEmpty ? item.grade : _selectedGrade;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            int? bsMaxAyat;
+            if (bsSelectedSurahNumber != null) {
+              try {
+                final surah = allSurahs.firstWhere((s) => s.number == bsSelectedSurahNumber);
+                bsMaxAyat = surah.ayatCount;
+              } catch (_) {}
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppTheme.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+                      const SizedBox(height: 16),
+                      const Text('Edit Surah', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                      const SizedBox(height: 16),
+
+                      const Text('Nama Surah', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                      const SizedBox(height: 6),
+                      Autocomplete<MapEntry<int, String>>(
+                        initialValue: TextEditingValue(text: item.surahName),
+                        optionsBuilder: (textEditingValue) {
+                          final q = textEditingValue.text.toLowerCase().trim();
+                          if (q.isEmpty) return surahNames.entries;
+                          return surahNames.entries.where(
+                            (e) => e.value.toLowerCase().contains(q) || e.key.toString() == q,
+                          );
+                        },
+                        displayStringForOption: (opt) => opt.value,
+                        onSelected: (opt) {
+                          bsSurahController.text = opt.value;
+                          bsSelectedSurahNumber = opt.key;
+                          setModalState(() {});
+                        },
+                        fieldViewBuilder: (ctx2, textController, focusNode, onFieldSubmitted) {
+                          return Container(
+                            decoration: BoxDecoration(color: AppTheme.bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.grey100, width: 1)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.menu_book_rounded, color: AppTheme.primaryGreen, size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: TextField(
+                                    controller: textController,
+                                    focusNode: focusNode,
+                                    onChanged: (val) {
+                                      bsSurahController.text = val;
+                                      bsSelectedSurahNumber = findSurahNumber(val);
+                                      setModalState(() {});
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'Cari nama surah...',
+                                      hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey400),
+                                      border: InputBorder.none, isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        optionsViewBuilder: (ctx2, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 4, borderRadius: BorderRadius.circular(12),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 180),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero, shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (ctx3, idx) {
+                                    final opt = options.elementAt(idx);
+                                    return ListTile(dense: true, title: Text('${opt.key}. ${opt.value}', style: const TextStyle(fontSize: 13)), onTap: () => onSelected(opt));
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('Ayat Dari', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(color: AppTheme.bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.grey100, width: 1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                              child: TextField(controller: bsAyatFromController, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Dari...', hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey400), border: InputBorder.none, isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 14))),
+                            ),
+                          ])),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(bsMaxAyat != null ? 'Ayat Sampai (maks $bsMaxAyat)' : 'Ayat Sampai', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                            const SizedBox(height: 6),
+                            Container(
+                              decoration: BoxDecoration(color: AppTheme.bgColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.grey100, width: 1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                              child: TextField(controller: bsAyatToController, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Sampai...', hintStyle: TextStyle(fontSize: 13, color: AppTheme.grey400), border: InputBorder.none, isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 14))),
+                            ),
+                          ])),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildGradeMiniSelector(bsGrade, (g) => bsGrade = g, setModalState),
+                      const SizedBox(height: 20),
+
+                      GestureDetector(
+                        onTap: () {
+                          final sNum = bsSelectedSurahNumber ?? findSurahNumber(bsSurahController.text);
+                          final aFrom = int.tryParse(bsAyatFromController.text.trim());
+                          var aTo = int.tryParse(bsAyatToController.text.trim());
+                          if (sNum == null || bsSurahController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Pilih surah terlebih dahulu'), backgroundColor: Colors.red.shade400, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                            return;
+                          }
+                          if (aFrom == null || aTo == null || aFrom <= 0 || aTo <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Ayat dari dan sampai harus diisi'), backgroundColor: Colors.red.shade400, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))));
+                            return;
+                          }
+                          if (bsMaxAyat != null && aTo > bsMaxAyat) aTo = bsMaxAyat;
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _surahItems[index] = SetoranItem(id: item.id, surahNumber: sNum, ayatFrom: aFrom, ayatTo: aTo!, grade: bsGrade);
+                          });
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(gradient: AppTheme.mainGradient, borderRadius: BorderRadius.circular(AppTheme.radiusMd), boxShadow: AppTheme.greenGlow),
+                          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.check_rounded, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text('Simpan Perubahan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                          ]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

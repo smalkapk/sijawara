@@ -80,7 +80,7 @@ class QuranReadingService {
   static const String _historyKey = 'quran_reading_history';
   static const String _lastReadKey = 'quran_last_read';
   static const String _bookmarksKey = 'quran_bookmarks';
-  static const int _maxHistoryItems = 50;
+  static const int _maxHistoryItems = 10;
 
   // ── Singleton ──
   static final QuranReadingService _instance = QuranReadingService._();
