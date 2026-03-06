@@ -838,13 +838,7 @@ class _GuruAlkaAiPageState extends State<GuruAlkaAiPage> {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, -4),
-            blurRadius: 12,
-          ),
-        ],
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: SafeArea(
         child: Padding(
@@ -893,7 +887,7 @@ class _GuruAlkaAiPageState extends State<GuruAlkaAiPage> {
                   decoration: BoxDecoration(
                     gradient: AppTheme.mainGradient,
                     shape: BoxShape.circle,
-                    boxShadow: AppTheme.greenGlow,
+                    border: Border.all(color: AppTheme.grey100, width: 1),
                   ),
                   child: const Center(
                     child: Icon(
@@ -1002,15 +996,7 @@ class _ChatBubbleAnimatedState extends State<_ChatBubbleAnimated>
                     bottomLeft: Radius.circular(isUser ? 20 : 4),
                     bottomRight: Radius.circular(isUser ? 4 : 20),
                   ),
-                  boxShadow: isUser
-                      ? AppTheme.greenGlow
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                  border: Border.all(color: AppTheme.grey100, width: 1),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -1100,7 +1086,7 @@ class _ChatBubbleAnimatedState extends State<_ChatBubbleAnimated>
                     decoration: BoxDecoration(
                       gradient: AppTheme.mainGradient,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: AppTheme.greenGlow,
+                      border: Border.all(color: AppTheme.grey100, width: 1),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1181,13 +1167,7 @@ class _TypingDotsIndicatorState extends State<_TypingDotsIndicator>
             bottomLeft: Radius.circular(4),
             bottomRight: Radius.circular(20),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

@@ -246,13 +246,9 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
       decoration: BoxDecoration(
         color: AppTheme.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(
+          bottom: BorderSide(color: AppTheme.grey100, width: 1),
+        ),
       ),
       child: Row(
         children: [
@@ -544,7 +540,6 @@ class _SurahDetailPageState extends State<SurahDetailPage> {
       decoration: BoxDecoration(
         gradient: AppTheme.mainGradient,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.greenGlow,
       ),
       child: Column(
         children: [

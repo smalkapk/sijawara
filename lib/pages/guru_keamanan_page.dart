@@ -127,7 +127,7 @@ class _GuruKeamananPageState extends State<GuruKeamananPage> {
             decoration: BoxDecoration(
               color: AppTheme.white,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              boxShadow: AppTheme.softShadow,
+              border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

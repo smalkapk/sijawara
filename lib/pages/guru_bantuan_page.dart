@@ -295,8 +295,7 @@ class _GuruBantuanPageState extends State<GuruBantuanPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        border: Border.all(color: AppTheme.grey100),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Material(
         color: Colors.transparent,

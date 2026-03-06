@@ -280,11 +280,11 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
                 Container(
                   width: 100,
                   height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: AppTheme.mainGradient,
-                    boxShadow: AppTheme.greenGlow,
-                  ),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: AppTheme.mainGradient,
+                      border: Border.all(color: AppTheme.grey100, width: 1),
+                    ),
                   child: Padding(
                     padding: const EdgeInsets.all(3),
                     child: Container(
@@ -329,13 +329,6 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
                       shape: BoxShape.circle,
                       color: AppTheme.primaryGreen,
                       border: Border.all(color: Colors.white, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryGreen.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: const Icon(
                       Icons.camera_alt_rounded,
@@ -376,7 +369,7 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,7 +422,7 @@ class _GuruProfilAndaPageState extends State<GuruProfilAndaPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

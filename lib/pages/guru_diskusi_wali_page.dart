@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
+import '../widgets/skeleton_loader.dart';
 import '../services/chat_service.dart';
 import 'guru_chat_page.dart';
 
@@ -316,29 +317,50 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              color: AppTheme.primaryGreen,
-            ),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Memuat daftar wali...',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.grey400,
-              fontWeight: FontWeight.w500,
-            ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SkeletonLoader(
+                height: 48,
+                width: 48,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonLoader(height: 14, width: double.infinity),
+                    const SizedBox(height: 8),
+                    SkeletonLoader(height: 12, width: 160, borderRadius: BorderRadius.circular(6)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  SkeletonLoader(height: 12, width: 48, borderRadius: BorderRadius.circular(6)),
+                  const SizedBox(height: 8),
+                  SkeletonLoader(height: 20, width: 24, borderRadius: BorderRadius.circular(8)),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -378,6 +400,9 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
   }
 
   Widget _buildChatListItem(WaliContact contact, int index) {
+    final hasUnread = contact.unreadCount > 0;
+    final hasLastMessage = contact.lastMessage != null;
+
     return InkWell(
       onTap: () async {
         HapticFeedback.lightImpact();
@@ -395,31 +420,45 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
         _loadContacts();
       },
       child: Container(
-        color: AppTheme.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(color: AppTheme.grey100, width: 1),
+        ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar
             CircleAvatar(
-              radius: 26,
-              backgroundColor: _getAvatarColor(index),
-              child: Text(
-                contact.initials,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+              radius: 24,
+              backgroundColor: _getAvatarColor(index).withValues(alpha: 0.12),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _getAvatarColor(index),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    contact.initials,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 14),
-
-            // Chat info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Column(
@@ -429,9 +468,8 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                               contact.waliName,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: contact.unreadCount > 0
-                                    ? FontWeight.w800
-                                    : FontWeight.w600,
+                                fontWeight:
+                                    hasUnread ? FontWeight.w800 : FontWeight.w700,
                                 color: AppTheme.textPrimary,
                               ),
                               maxLines: 1,
@@ -443,7 +481,7 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: AppTheme.primaryGreen,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.w600,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -452,19 +490,43 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        _formatTime(contact.lastMessageTime),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: contact.unreadCount > 0
-                              ? const Color(0xFF25D366)
-                              : AppTheme.grey400,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formatTime(contact.lastMessageTime),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: hasUnread
+                                  ? AppTheme.primaryGreen
+                                  : AppTheme.grey400,
+                            ),
+                          ),
+                          if (hasUnread) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryGreen,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                contact.unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
-                  if (contact.lastMessage != null) ...[
+                  if (hasLastMessage) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -472,7 +534,7 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                           Icon(
                             Icons.done_all_rounded,
                             size: 18,
-                            color: const Color(0xFF53BDEB),
+                            color: AppTheme.softBlue,
                           ),
                           const SizedBox(width: 4),
                         ],
@@ -481,36 +543,16 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
                             contact.lastMessage!,
                             style: TextStyle(
                               fontSize: 14,
-                              color: contact.unreadCount > 0
-                                  ? AppTheme.textPrimary
-                                  : AppTheme.grey400,
-                              fontWeight: contact.unreadCount > 0
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
+                              color:
+                                  hasUnread ? AppTheme.textPrimary : AppTheme.textSecondary,
+                              fontWeight:
+                                  hasUnread ? FontWeight.w600 : FontWeight.w500,
                               height: 1.3,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (contact.unreadCount > 0)
-                          Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF25D366),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              contact.unreadCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ],

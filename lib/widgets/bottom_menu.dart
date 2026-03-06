@@ -105,12 +105,15 @@ class _BottomMenuState extends State<BottomMenu> {
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                        border: Border(
+              top: BorderSide(color: AppTheme.grey100, width: 1),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 20,
-                offset: const Offset(0, -6),
-                spreadRadius: -4,
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                spreadRadius: 2,
+                offset: const Offset(0, -4),
               ),
             ],
           ),
@@ -221,16 +224,6 @@ class _MenuButtonState extends State<_MenuButton>
                   gradient: widget.isSelected ? widget.gradient : null,
                   color: widget.isSelected ? null : AppTheme.bgColor,
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: widget.isSelected
-                      ? [
-                          BoxShadow(
-                            color: widget.gradient.colors.first
-                                .withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : null,
                 ),
                 child: Icon(
                   widget.icon,

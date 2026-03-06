@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
@@ -17,6 +18,7 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
 
   final _judulController = TextEditingController();
   final _deskripsiController = TextEditingController();
+  final Set<TextEditingController> _showHelperFor = {};
   String _selectedPriority = 'Sedang'; // Default
   String _selectedTarget = 'keduanya'; // Default kirim kepada
   String _selectedIcon = 'campaign'; // Default icon
@@ -43,6 +45,16 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
       curve: Curves.easeOutCubic,
     );
     _fadeController.forward();
+    _judulController.addListener(() {
+      if (_judulController.text.trim().isNotEmpty && _showHelperFor.remove(_judulController)) {
+        if (mounted) setState(() {});
+      }
+    });
+    _deskripsiController.addListener(() {
+      if (_deskripsiController.text.trim().isNotEmpty && _showHelperFor.remove(_deskripsiController)) {
+        if (mounted) setState(() {});
+      }
+    });
   }
 
   @override
@@ -51,6 +63,15 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
     _judulController.dispose();
     _deskripsiController.dispose();
     super.dispose();
+  }
+
+  void _triggerHelper(TextEditingController controller) {
+    if (_showHelperFor.contains(controller)) return;
+    setState(() => _showHelperFor.add(controller));
+    Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _showHelperFor.remove(controller));
+    });
   }
 
   void _kirimForm() async {
@@ -110,6 +131,163 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
         );
       }
     }
+  }
+
+  void _showEnhanceSheet(String content) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.only(top: 8),
+        decoration: const BoxDecoration(
+          color: AppTheme.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.grey200,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Icon(Icons.auto_awesome_rounded, size: 20, color: AppTheme.primaryGreen),
+                        SizedBox(height: 8),
+                        Text(
+                          'Apa yang ingin Anda sempurnakan?',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Card with content preview
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.grey100, width: 1),
+                      ),
+                      child: Text(
+                        content.isEmpty ? '-' : content,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textSecondary,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Options
+                    Column(
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.grey100, width: 1),
+                            ),
+                            child: const Icon(Icons.auto_fix_high, size: 18, color: AppTheme.primaryGreen),
+                          ),
+                          title: const Text('Sempurnakan'),
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.grey100, width: 1),
+                            ),
+                            child: const Icon(Icons.open_in_full, size: 18, color: AppTheme.primaryGreen),
+                          ),
+                          title: const Text('Perpanjang'),
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.grey100, width: 1),
+                            ),
+                            child: const Icon(Icons.compress, size: 18, color: AppTheme.primaryGreen),
+                          ),
+                          title: const Text('Perpendek'),
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.grey100, width: 1),
+                            ),
+                            child: const Icon(Icons.language, size: 18, color: AppTheme.primaryGreen),
+                          ),
+                          title: const Text('Ubah bahasa inggris'),
+                          onTap: () => Navigator.pop(context),
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.grey100, width: 1),
+                            ),
+                            child: const Icon(Icons.translate, size: 18, color: AppTheme.primaryGreen),
+                          ),
+                          title: const Text('Ubah Bahasa Indonesia'),
+                          onTap: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -245,13 +423,30 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
            children: [
              Icon(icon, size: 16, color: AppTheme.primaryGreen),
              const SizedBox(width: 8),
-             Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
+             Expanded(
+               child: Text(
+                 label,
+                 style: const TextStyle(
+                   fontSize: 14,
+                   fontWeight: FontWeight.w700,
+                   color: AppTheme.textPrimary,
+                 ),
+               ),
+             ),
+             const SizedBox(width: 8),
+             AnimatedBuilder(
+               animation: controller,
+               builder: (context, _) {
+                 final hasText = controller.text.trim().isNotEmpty;
+                 return GestureDetector(
+                   onTap: hasText ? () => _showEnhanceSheet(controller.text) : () => _triggerHelper(controller),
+                   child: Icon(
+                     Icons.auto_awesome_rounded,
+                     size: 16,
+                     color: hasText ? AppTheme.primaryGreen : AppTheme.grey400,
+                   ),
+                 );
+               },
              ),
            ]
         ),
@@ -260,13 +455,6 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
             border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -293,6 +481,20 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
               ),
             ],
           ),
+        ),
+        // Validation hint shown only when user tapped spark with empty input
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: _showHelperFor.contains(controller)
+              ? Text(
+                  'Ketik terlebih dahulu',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.red.shade400,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
       ],
     );
@@ -332,13 +534,6 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
             border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: DropdownButtonHideUnderline(
@@ -414,15 +609,7 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
                     color: isSelected ? AppTheme.primaryGreen : AppTheme.grey100,
                     width: isSelected ? 1.5 : 1,
                   ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppTheme.primaryGreen.withOpacity(0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
+                  // shadows removed; border indicates selection
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -512,13 +699,7 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
                   decoration: BoxDecoration(
                     color: AppTheme.white,
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: selectedEntry.$2.withOpacity(0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    border: Border.all(color: AppTheme.grey100, width: 1),
                   ),
                   child: Icon(selectedEntry.$1, color: selectedEntry.$2, size: 22),
                 ),
@@ -567,13 +748,6 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
             border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: Wrap(
@@ -603,15 +777,6 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
                       color: isSelected ? color : Colors.transparent,
                       width: isSelected ? 2 : 0,
                     ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: color.withOpacity(0.15),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : [],
                   ),
                   child: Center(
                     child: Icon(
@@ -717,13 +882,6 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppTheme.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, -10),
-          ),
-        ],
       ),
       child: SafeArea(
         child: GestureDetector(
@@ -904,13 +1062,7 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
             decoration: BoxDecoration(
               color: AppTheme.white,
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: Icon(icon, color: color, size: 20),
           ),

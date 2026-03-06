@@ -184,7 +184,7 @@ class _GuruTugasPageState extends State<GuruTugasPage>
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Row(
           children: [

@@ -250,7 +250,6 @@ class _WaliGuruInputState extends State<WaliGuruInput> {
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         border: Border.all(color: AppTheme.grey100, width: 1),
-        boxShadow: AppTheme.softShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -294,7 +293,6 @@ class _WaliGuruInputState extends State<WaliGuruInput> {
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         border: Border.all(color: AppTheme.grey100, width: 1),
-        boxShadow: AppTheme.softShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -358,13 +356,6 @@ class _WaliGuruInputState extends State<WaliGuruInput> {
                         decoration: BoxDecoration(
                           color: AppTheme.primaryGreen,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
                         child: const Text(
                           'BERITA',

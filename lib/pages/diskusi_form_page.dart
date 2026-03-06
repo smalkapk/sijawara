@@ -170,7 +170,6 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
                           gradient: AppTheme.mainGradient,
                           borderRadius:
                               BorderRadius.circular(AppTheme.radiusMd),
-                          boxShadow: AppTheme.greenGlow,
                         ),
                         child: const Center(
                           child: Text(
@@ -397,10 +396,9 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
             decoration: BoxDecoration(
               color: AppTheme.white,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              boxShadow: AppTheme.softShadow,
               border: Border.all(
-                color: AppTheme.primaryGreen.withOpacity(0.15),
-                width: 1.5,
+                color: AppTheme.grey100,
+                width: 1,
               ),
             ),
             child: Row(
@@ -452,10 +450,9 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
             border: Border.all(
-              color: AppTheme.primaryGreen.withOpacity(0.15),
-              width: 1.5,
+              color: AppTheme.grey100,
+              width: 1,
             ),
           ),
           child: TextField(
@@ -496,10 +493,9 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
             border: Border.all(
-              color: AppTheme.primaryGreen.withOpacity(0.15),
-              width: 1.5,
+              color: AppTheme.grey100,
+              width: 1,
             ),
           ),
           child: TextField(
@@ -542,10 +538,9 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
             border: Border.all(
-              color: AppTheme.softPurple.withOpacity(0.15),
-              width: 1.5,
+              color: AppTheme.grey100,
+              width: 1,
             ),
           ),
           child: TextField(
@@ -587,10 +582,9 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
             border: Border.all(
-              color: AppTheme.softPurple.withOpacity(0.15),
-              width: 1.5,
+              color: AppTheme.grey100,
+              width: 1,
             ),
           ),
           child: TextField(
@@ -658,12 +652,11 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
             decoration: BoxDecoration(
               color: AppTheme.white,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              boxShadow: AppTheme.softShadow,
               border: Border.all(
                 color: _signatureBase64.isEmpty
                     ? Colors.red.withOpacity(0.3)
-                    : AppTheme.primaryGreen.withOpacity(0.3),
-                width: 1.5,
+                    : AppTheme.grey100,
+                width: 1,
               ),
             ),
             child: _signatureBase64.isNotEmpty
@@ -792,7 +785,6 @@ class _DiskusiFormPageState extends State<DiskusiFormPage>
           gradient: _isSaving ? null : AppTheme.mainGradient,
           color: _isSaving ? AppTheme.grey200 : null,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: _isSaving ? [] : AppTheme.greenGlow,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

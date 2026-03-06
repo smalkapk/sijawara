@@ -119,7 +119,6 @@ class PrayerCountdownSkeleton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: AppTheme.softShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,6 +168,99 @@ class PrayerCountdownSkeleton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Skeleton untuk Public Speaking note cards
+class PublicSpeakingSkeleton extends StatelessWidget {
+  const PublicSpeakingSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      itemCount: 3,
+      itemBuilder: (context, index) => _buildCardSkeleton(),
+    );
+  }
+
+  Widget _buildCardSkeleton() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF0F0F0), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row: icon + title + date chip
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonLoader(
+                height: 36,
+                width: 36,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SkeletonLoader(height: 14, width: double.infinity),
+                    const SizedBox(height: 6),
+                    SkeletonLoader(
+                      height: 12,
+                      width: 100,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  SkeletonLoader(
+                    height: 12,
+                    width: 60,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  const SizedBox(height: 10),
+                  SkeletonLoader(
+                    height: 24,
+                    width: 24,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Materi row
+          const SkeletonLoader(height: 11, width: 50),
+          const SizedBox(height: 6),
+          const SkeletonLoader(height: 14, width: double.infinity),
+          // Divider
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: SkeletonLoader(height: 1, width: double.infinity),
+          ),
+          // Mentor row
+          const SkeletonLoader(height: 11, width: 50),
+          const SizedBox(height: 6),
+          SkeletonLoader(
+            height: 14,
+            width: 160,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ],
       ),
     );
   }

@@ -814,13 +814,9 @@ class _AlkaAiPageState extends State<AlkaAiPage> {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, -4),
-            blurRadius: 12,
-          ),
-        ],
+        border: const Border(
+          top: BorderSide(color: AppTheme.grey100, width: 1),
+        ),
       ),
       child: SafeArea(
         child: Padding(
@@ -978,15 +974,7 @@ class _ChatBubbleAnimatedState extends State<_ChatBubbleAnimated>
                     bottomLeft: Radius.circular(isUser ? 20 : 4),
                     bottomRight: Radius.circular(isUser ? 4 : 20),
                   ),
-                  boxShadow: isUser
-                      ? AppTheme.greenGlow
-                      : [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                  border: Border.all(color: AppTheme.grey100, width: 1),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -1157,13 +1145,7 @@ class _TypingDotsIndicatorState extends State<_TypingDotsIndicator>
             bottomLeft: Radius.circular(4),
             bottomRight: Radius.circular(20),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

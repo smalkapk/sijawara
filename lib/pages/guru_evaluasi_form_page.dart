@@ -618,7 +618,6 @@ class _GuruEvaluasiFormPageState extends State<GuruEvaluasiFormPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.softShadow,
         border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
@@ -920,13 +919,6 @@ class _GuruEvaluasiFormPageState extends State<GuruEvaluasiFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
             border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

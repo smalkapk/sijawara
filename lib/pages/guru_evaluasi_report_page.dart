@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../widgets/skeleton_loader.dart';
 import '../services/guru_evaluasi_service.dart';
 import 'guru_evaluasi_form_page.dart';
 
@@ -67,9 +68,15 @@ class _GuruEvaluasiReportPageState extends State<GuruEvaluasiReportPage> {
             _buildHeader(context),
             Expanded(
               child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                          color: AppTheme.primaryGreen),
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Column(
+                        children: List.generate(3, (index) => _buildReportSkeleton()),
+                      ),
                     )
                   : _reports.isEmpty
                       ? Center(
@@ -215,15 +222,6 @@ class _GuruEvaluasiReportPageState extends State<GuruEvaluasiReportPage> {
               ? AppTheme.primaryGreen.withOpacity(0.05)
               : AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryGreen.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : AppTheme.softShadow,
           border: Border.all(
             color: isSelected ? AppTheme.primaryGreen : AppTheme.grey100,
             width: isSelected ? 2 : 1,
@@ -238,87 +236,121 @@ class _GuruEvaluasiReportPageState extends State<GuruEvaluasiReportPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: Row(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.softBlue.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.assignment_turned_in_rounded,
-                          color: AppTheme.softBlue,
-                          size: 20,
+                      Text(
+                        report.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              report.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppTheme.softBlue.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Bulan: ${report.bulan}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.softBlue,
-                                ),
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Bulan ${report.bulan}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.grey400,
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    formattedDate,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.grey400,
-                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
 
-            // ── Sections: A, B, C ──
-            for (final kategori in evaluasiStruktur) ...[
-              _buildKategoriSection(
-                  kategori, report.nilaiData, report.keteranganData),
-              if (kategori.kode != 'C') _buildDivider(),
-            ],
+            // Collapsible detail: show only when selected
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Sections: A, B, C ──
+                  for (final kategori in evaluasiStruktur) ...[
+                    _buildKategoriSection(
+                        kategori, report.nilaiData, report.keteranganData),
+                    if (kategori.kode != 'C') _buildDivider(),
+                  ],
 
-            // ── Catatan ──
-            if (report.catatan.isNotEmpty) ...[
-              _buildDivider(),
-              _buildLabelValue('Catatan', report.catatan),
-            ],
+                  // ── Catatan ──
+                  if (report.catatan.isNotEmpty) ...[
+                    _buildDivider(),
+                    _buildLabelValue('Catatan', report.catatan),
+                  ],
+                ],
+              ),
+              crossFadeState: isSelected
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 250),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReportSkeleton() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(color: AppTheme.grey100, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SkeletonLoader(
+                height: 36,
+                width: 36,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SkeletonLoader(height: 16, width: double.infinity),
+                    const SizedBox(height: 8),
+                    SkeletonLoader(height: 12, width: 120, borderRadius: BorderRadius.circular(8)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const SkeletonLoader(height: 12, width: 60, borderRadius: BorderRadius.zero),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const SkeletonLoader(height: 12, width: 180),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SkeletonLoader(
+                  height: 80,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SkeletonLoader(
+                  height: 80,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SkeletonLoader(height: 48, borderRadius: BorderRadius.circular(12)),
+        ],
       ),
     );
   }

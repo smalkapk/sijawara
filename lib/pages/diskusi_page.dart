@@ -14,9 +14,12 @@ class DiskusiPage extends StatefulWidget {
 }
 
 class _DiskusiPageState extends State<DiskusiPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+
+  late AnimationController _shimmerController;
+  late Animation<double> _shimmerAnimation;
 
   List<DiskusiNote> _notes = [];
   bool _isLoading = true;
@@ -34,6 +37,15 @@ class _DiskusiPageState extends State<DiskusiPage>
       curve: Curves.easeOutCubic,
     );
     _fadeController.forward();
+
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+    _shimmerAnimation = Tween<double>(begin: -2.0, end: 2.0).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOutSine),
+    );
+
     _loadNotes();
   }
 
@@ -145,7 +157,6 @@ class _DiskusiPageState extends State<DiskusiPage>
                         gradient: AppTheme.mainGradient,
                         borderRadius:
                             BorderRadius.circular(AppTheme.radiusMd),
-                        boxShadow: AppTheme.greenGlow,
                       ),
                       child: const Center(
                         child: Text(
@@ -229,6 +240,7 @@ class _DiskusiPageState extends State<DiskusiPage>
   @override
   void dispose() {
     _fadeController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -336,26 +348,74 @@ class _DiskusiPageState extends State<DiskusiPage>
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppTheme.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, -10),
+        border: Border(
+          top: BorderSide(
+            color: AppTheme.grey100,
+            width: 1,
           ),
-        ],
+        ),
       ),
       child: SafeArea(
         child: Row(
           children: [
+            // Tombol Hapus — slide in/out dengan AnimatedSize + ClipRect
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: ClipRect(
+                child: hasSelection
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              _deleteNote(_notes[_selectedNoteIndex!]);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius:
+                                    BorderRadius.circular(AppTheme.radiusMd),
+                                border: Border.all(
+                                    color: Colors.red.shade200, width: 1),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded,
+                                      color: Colors.red.shade500, size: 20),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Hapus',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.red.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+            // Tombol Edit / Tambah
             Expanded(
               child: GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
                   if (hasSelection) {
-                    final selectedNote = _notes[_selectedNoteIndex!];
-                    _openEditForm(selectedNote);
+                    _openEditForm(_notes[_selectedNoteIndex!]);
                   } else {
                     _openAddForm();
                   }
@@ -367,14 +427,6 @@ class _DiskusiPageState extends State<DiskusiPage>
                     gradient: hasSelection ? null : AppTheme.mainGradient,
                     color: hasSelection ? AppTheme.gold : null,
                     borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                    boxShadow: hasSelection
-                        ? [
-                            BoxShadow(
-                                color: AppTheme.gold.withOpacity(0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4))
-                          ]
-                        : AppTheme.greenGlow,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -406,31 +458,113 @@ class _DiskusiPageState extends State<DiskusiPage>
     );
   }
 
-  // ── Loading State ──
+  // ── Loading State (Skeleton) ──
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              color: AppTheme.primaryGreen,
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 100),
+      itemCount: 4,
+      itemBuilder: (context, index) => _buildSkeletonCard(),
+    );
+  }
+
+  Widget _buildSkeletonCard() {
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, child) {
+        final shimmerGradient = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: const [
+            Color(0xFFEEEEEE),
+            Color(0xFFF8F8F8),
+            Color(0xFFEEEEEE),
+          ],
+          stops: [
+            (_shimmerAnimation.value - 1).clamp(0.0, 1.0),
+            (_shimmerAnimation.value).clamp(0.0, 1.0),
+            (_shimmerAnimation.value + 1).clamp(0.0, 1.0),
+          ],
+        );
+
+        Widget shimmerBox({
+          double width = double.infinity,
+          double height = 14,
+          double radius = 8,
+        }) {
+          return Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              gradient: shimmerGradient,
+              borderRadius: BorderRadius.circular(radius),
             ),
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Memuat catatan...',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.grey400,
-              fontWeight: FontWeight.w500,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  shimmerBox(width: 36, height: 36, radius: 10),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        shimmerBox(height: 16),
+                        const SizedBox(height: 6),
+                        shimmerBox(width: 120, height: 12),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  shimmerBox(width: 60, height: 12),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Materi
+              shimmerBox(width: 60, height: 11),
+              const SizedBox(height: 6),
+              shimmerBox(height: 15),
+              const SizedBox(height: 4),
+              shimmerBox(width: 200, height: 15),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Container(height: 1, color: AppTheme.grey100),
+              ),
+              // Mentor
+              shimmerBox(width: 50, height: 11),
+              const SizedBox(height: 6),
+              shimmerBox(width: 160, height: 15),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Container(height: 1, color: AppTheme.grey100),
+              ),
+              // Tanda tangan
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  shimmerBox(width: 130, height: 11),
+                  shimmerBox(width: 60, height: 20, radius: 8),
+                ],
+              ),
+              const SizedBox(height: 10),
+              shimmerBox(height: 60, radius: 8),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -536,92 +670,35 @@ class _DiskusiPageState extends State<DiskusiPage>
                 ? AppTheme.primaryGreen.withOpacity(0.05)
                 : AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppTheme.primaryGreen.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ]
-                : AppTheme.softShadow,
             border: Border.all(
-              color: isSelected ? AppTheme.primaryGreen : AppTheme.grey100,
-              width: isSelected ? 2 : 1,
+              color: AppTheme.grey100,
+              width: 1,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Header: judul + tanggal vertical
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.softPurple.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.menu_book_rounded,
-                            color: AppTheme.softPurple,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            note.judul.isNotEmpty
-                                ? note.judul
-                                : 'Tanpa Judul',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
+                  Text(
+                    note.judul.isNotEmpty ? note.judul : 'Tanpa Judul',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary,
+                      height: 1.3,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        formattedDate,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.grey400,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _deleteNote(note);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.delete_outline_rounded,
-                            color: Colors.red.shade400,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 4),
+                  Text(
+                    formattedDate,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.grey400,
+                    ),
                   ),
                 ],
               ),
@@ -752,7 +829,7 @@ class _DiskusiPageState extends State<DiskusiPage>
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: AppTheme.grey200),
+                border: Border.all(color: AppTheme.grey100, width: 1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Image.memory(

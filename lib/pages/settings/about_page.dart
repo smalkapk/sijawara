@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
+
+  Future<void> _launchURL(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,46 +19,91 @@ class AboutPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context),
+            _buildAppBar(context),
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.all(24),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // App identity card
-                    _buildAppCard(),
+                    const SizedBox(height: 20),
+                    // Logo
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.white,
+                        boxShadow: AppTheme.softShadow,
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/images/logo_sekolah.png', // Fallback ke logo sekolah yang ada
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.school_rounded,
+                              size: 48,
+                              color: AppTheme.primaryGreen,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
-
-                    // Info section
-                    _buildSectionTitle('Informasi Aplikasi'),
-                    const SizedBox(height: 10),
-                    _buildInfoCard(context),
-
-                    const SizedBox(height: 24),
-
-                    // School info section
-                    _buildSectionTitle('Tentang Sekolah'),
-                    const SizedBox(height: 10),
-                    _buildSchoolCard(context),
-
-                    const SizedBox(height: 24),
-
-                    // Tech stack section
-                    _buildSectionTitle('Teknologi'),
-                    const SizedBox(height: 10),
-                    _buildTechCard(),
-
-                    const SizedBox(height: 24),
-
-                    // Support / contact
-                    _buildSectionTitle('Dukungan & Kontak'),
-                    const SizedBox(height: 10),
-                    _buildContactCard(context),
-
-                    const SizedBox(height: 24),
-                    _buildFooter(),
-                    const SizedBox(height: 40),
+                    const Text(
+                      'Sijawara Apps',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Versi 1.0.0',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Sistem Informasi Jejaring Akademik dan Warga Sekolah (SIJAWARA) adalah platform digital terpadu untuk mendukung ekosistem pendidikan di SMA Muhammadiyah Al Kautsar Program Khusus.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.6,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    _buildLinkItem(
+                      icon: Icons.language_rounded,
+                      title: 'Website Resmi',
+                      subtitle: 'smamalkautsar.sch.id',
+                      onTap: () => _launchURL('https://smamalkautsar.sch.id'),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildLinkItem(
+                      icon: Icons.email_rounded,
+                      title: 'Hubungi Kami',
+                      subtitle: 'info@smamalkautsar.sch.id',
+                      onTap: () => _launchURL('mailto:info@smamalkautsar.sch.id'),
+                    ),
                   ],
                 ),
               ),
@@ -63,23 +114,20 @@ class AboutPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildAppBar(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 24, 16),
+      padding: const EdgeInsets.fromLTRB(8, 8, 24, 12),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 18, color: AppTheme.textPrimary),
-            style: IconButton.styleFrom(
-              backgroundColor: AppTheme.white,
-              padding: const EdgeInsets.all(10),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+            icon: const Icon(
+              Icons.arrow_back_ios_rounded,
+              size: 20,
+              color: AppTheme.textPrimary,
             ),
+            splashRadius: 22,
           ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,11 +135,11 @@ class AboutPage extends StatelessWidget {
                 Row(
                   children: [
                     Icon(Icons.info_outline_rounded,
-                        size: 13, color: AppTheme.textSecondary),
-                    const SizedBox(width: 5),
+                        size: 14, color: AppTheme.primaryGreen),
+                    const SizedBox(width: 6),
                     Text(
-                      'Pengaturan',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      'Informasi',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
@@ -102,7 +150,7 @@ class AboutPage extends StatelessWidget {
                 Text(
                   'Tentang Aplikasi',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.3,
                       ),
@@ -115,431 +163,63 @@ class AboutPage extends StatelessWidget {
     );
   }
 
-  Widget _buildAppCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-      decoration: BoxDecoration(
-        gradient: AppTheme.mainGradient,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: AppTheme.greenGlow,
-      ),
-      child: Column(
-        children: [
-          // App icon
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppTheme.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                  color: AppTheme.white.withOpacity(0.3), width: 2),
-            ),
-            child: const Center(
-              child: Icon(Icons.mosque_rounded,
-                  size: 36, color: AppTheme.white),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'SiJawara',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              color: AppTheme.white,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Sistem Informasi Jaring Karakter',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.white.withOpacity(0.8),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Version badge
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.tag_rounded,
-                    size: 14, color: AppTheme.softGold),
-                SizedBox(width: 4),
-                Text(
-                  'Versi 1.0.0',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.textPrimary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(BuildContext context) {
-    final items = [
-      {
-        'icon': Icons.info_outline_rounded,
-        'iconColor': AppTheme.softBlue,
-        'label': 'Nama Aplikasi',
-        'value': 'SiJawara',
-      },
-      {
-        'icon': Icons.tag_rounded,
-        'iconColor': AppTheme.primaryGreen,
-        'label': 'Versi',
-        'value': '1.0.0',
-      },
-      {
-        'icon': Icons.build_outlined,
-        'iconColor': AppTheme.warmOrange,
-        'label': 'Build',
-        'value': '20260219',
-      },
-      {
-        'icon': Icons.devices_rounded,
-        'iconColor': AppTheme.teal,
-        'label': 'Platform',
-        'value': 'Android & iOS',
-      },
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        children: List.generate(items.length, (i) {
-          final item = items[i];
-          return Column(
-            children: [
-              _buildInfoRow(
-                icon: item['icon'] as IconData,
-                iconColor: item['iconColor'] as Color,
-                label: item['label'] as String,
-                value: item['value'] as String,
-              ),
-              if (i < items.length - 1)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Divider(height: 1, color: AppTheme.grey100),
-                ),
-            ],
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildSchoolCard(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: AppTheme.mainGradient,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Center(
-                  child: Icon(Icons.school_rounded,
-                      size: 26, color: AppTheme.white),
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SMA Muhammadiyah',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      'Al Kautsar Program Khusus',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Bandar Lampung, Lampung',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.grey400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Divider(height: 1, color: AppTheme.grey100),
-          const SizedBox(height: 16),
-          _buildInfoRow(
-            icon: Icons.language_rounded,
-            iconColor: AppTheme.softBlue,
-            label: 'Website',
-            value: 'portal-smalka.com',
-            onTap: () => _launchUrl('https://portal-smalka.com'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTechCard() {
-    final techs = [
-      {
-        'icon': Icons.flutter_dash,
-        'color': const Color(0xFF54C5F8),
-        'name': 'Flutter',
-        'desc': 'UI Framework'
-      },
-      {
-        'icon': Icons.storage_rounded,
-        'color': AppTheme.warmOrange,
-        'name': 'PHP + MySQL',
-        'desc': 'Backend API'
-      },
-      {
-        'icon': Icons.cloud_rounded,
-        'color': AppTheme.softBlue,
-        'name': 'REST API',
-        'desc': 'Komunikasi server'
-      },
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Row(
-        children: techs.map((tech) {
-          return Expanded(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: (tech['color'] as Color).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(tech['icon'] as IconData,
-                      size: 22, color: tech['color'] as Color),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  tech['name'] as String,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                Text(
-                  tech['desc'] as String,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppTheme.grey400,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildContactCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: Column(
-        children: [
-          _buildInfoRow(
-            icon: Icons.email_outlined,
-            iconColor: AppTheme.softBlue,
-            label: 'Email Dukungan',
-            value: 'info@portal-smalka.com',
-            onTap: () =>
-                _launchUrl('mailto:info@portal-smalka.com'),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(height: 1, color: AppTheme.grey100),
-          ),
-          _buildInfoRow(
-            icon: Icons.bug_report_outlined,
-            iconColor: const Color(0xFFEF4444),
-            label: 'Laporkan Masalah',
-            value: 'Kirim laporan',
-            onTap: () =>
-                _launchUrl('mailto:info@portal-smalka.com?subject=Bug Report SiJawara'),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(height: 1, color: AppTheme.grey100),
-          ),
-          _buildInfoRow(
-            icon: Icons.star_outline_rounded,
-            iconColor: AppTheme.gold,
-            label: 'Beri Ulasan',
-            value: 'Play Store',
-            onTap: () {
-              HapticFeedback.lightImpact();
-              // TODO: replace with actual Play Store link
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow({
+  Widget _buildLinkItem({
     required IconData icon,
-    required Color iconColor,
-    required String label,
-    required String value,
-    VoidCallback? onTap,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: onTap != null
-          ? () {
-              HapticFeedback.lightImpact();
-              onTap();
-            }
-          : null,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey200),
+        ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
+                color: AppTheme.primaryGreen.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 16, color: iconColor),
+              child: Icon(icon, size: 20, color: AppTheme.primaryGreen),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    label,
+                    title,
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.grey400,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
                     ),
                   ),
                   Text(
-                    value,
-                    style: TextStyle(
+                    subtitle,
+                    style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: onTap != null
-                          ? AppTheme.primaryGreen
-                          : AppTheme.textPrimary,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
-            if (onTap != null)
-              const Icon(Icons.chevron_right_rounded,
-                  size: 18, color: AppTheme.grey400),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.grey400,
+            ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildFooter() {
-    return Column(
-      children: [
-        Text(
-          'Made with ❤️ for SMA Muhammadiyah Al Kautsar PK',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppTheme.grey400,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          '© 2026 SiJawara. All rights reserved.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 11,
-            color: AppTheme.grey200,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 }

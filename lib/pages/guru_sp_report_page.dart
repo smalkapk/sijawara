@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/guru_sp_service.dart';
 import 'guru_sp_form_page.dart';
 
 class GuruSpReportPage extends StatefulWidget {
@@ -15,23 +16,99 @@ class GuruSpReportPage extends StatefulWidget {
 
 class _GuruSpReportPageState extends State<GuruSpReportPage> {
   int? _selectedReportIndex;
+  List<GuruSpReport> _reports = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final List<Map<String, dynamic>> dummyReports = const [
-    {
-      'date': '24-02-2026',
-      'jenis_sp': 'SP 1',
-      'alasan': 'Terlambat masuk sekolah lebih dari 3 kali berturut-turut tanpa keterangan.',
-      'tindakan': 'Pemanggilan orang tua dan pembinaan konseling.',
-      'note': 'Siswa telah diberikan peringatan lisan sebelumnya. Orang tua sudah dihubungi.',
-    },
-    {
-      'date': '10-01-2026',
-      'jenis_sp': 'Peringatan Lisan',
-      'alasan': 'Tidak mengerjakan tugas berturut-turut pada mata pelajaran Matematika.',
-      'tindakan': 'Teguran lisan oleh guru mata pelajaran dan wali kelas.',
-      'note': 'Siswa berjanji untuk memperbaiki motivasi belajarnya.',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadReports();
+  }
+
+  int get _studentId => widget.studentData['student_id'] is int
+      ? widget.studentData['student_id']
+      : int.tryParse(widget.studentData['student_id']?.toString() ?? '0') ?? 0;
+
+  Future<void> _loadReports() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final reports = await GuruSpService.getReports(studentId: _studentId);
+      if (mounted) {
+        setState(() {
+          _reports = reports;
+          _isLoading = false;
+          _selectedReportIndex = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Gagal memuat laporan SP';
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteReport(GuruSpReport report) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Laporan SP'),
+        content: Text('Yakin ingin menghapus laporan "${report.jenisSp}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Hapus', style: TextStyle(color: Colors.red.shade400)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+      ),
+    );
+
+    try {
+      await GuruSpService.deleteReport(report.id);
+      if (mounted) {
+        Navigator.pop(context); // close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Laporan SP berhasil dihapus'),
+            backgroundColor: AppTheme.primaryGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        _loadReports();
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Gagal menghapus laporan SP'),
+            backgroundColor: Colors.red.shade400,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,24 +119,7 @@ class _GuruSpReportPageState extends State<GuruSpReportPage> {
           children: [
             _buildHeader(context),
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Column(
-                  children: [
-                    ...dummyReports.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final report = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: _buildReportCard(report, index),
-                      );
-                    }),
-                    const SizedBox(height: 100),
-                  ],
-                ),
-              ),
+              child: _buildBody(),
             ),
           ],
         ),
@@ -136,7 +196,97 @@ class _GuruSpReportPageState extends State<GuruSpReportPage> {
     );
   }
 
-  Widget _buildReportCard(Map<String, dynamic> report, int index) {
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 48, color: AppTheme.grey400),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.grey400,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: _loadReports,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.mainGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Coba Lagi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_reports.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.assignment_outlined, size: 48, color: AppTheme.grey400),
+            const SizedBox(height: 12),
+            Text(
+              'Belum ada laporan SP',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.grey400,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadReports,
+      color: AppTheme.primaryGreen,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          children: [
+            ..._reports.asMap().entries.map((entry) {
+              final index = entry.key;
+              final report = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: _buildReportCard(report, index),
+              );
+            }),
+            const SizedBox(height: 100),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportCard(GuruSpReport report, int index) {
     final isSelected = _selectedReportIndex == index;
 
     return GestureDetector(
@@ -158,15 +308,6 @@ class _GuruSpReportPageState extends State<GuruSpReportPage> {
               ? AppTheme.primaryGreen.withOpacity(0.05)
               : AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryGreen.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : AppTheme.softShadow,
           border: Border.all(
             color: isSelected ? AppTheme.primaryGreen : AppTheme.grey100,
             width: isSelected ? 2 : 1,
@@ -178,33 +319,38 @@ class _GuruSpReportPageState extends State<GuruSpReportPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.gold.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.gold.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.warning_amber_rounded,
+                          color: AppTheme.gold,
+                          size: 20,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.warning_amber_rounded,
-                        color: AppTheme.gold,
-                        size: 20,
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          report.jenisSp,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      report['jenis_sp'],
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Text(
-                  report['date'],
+                  report.date,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -214,14 +360,15 @@ class _GuruSpReportPageState extends State<GuruSpReportPage> {
               ],
             ),
             const SizedBox(height: 20),
-            _buildReportItem('Alasan/Pelanggaran', report['alasan']),
-            _buildDivider(),
-            _buildReportItem('Tindakan', report['tindakan']),
-            _buildDivider(),
-            _buildReportItem(
-              'Catatan Tambahan',
-              report['note'],
-            ),
+            _buildReportItem('Alasan/Pelanggaran', report.alasan),
+            if (report.tindakan.isNotEmpty) ...[
+              _buildDivider(),
+              _buildReportItem('Tindakan', report.tindakan),
+            ],
+            if (report.note.isNotEmpty) ...[
+              _buildDivider(),
+              _buildReportItem('Catatan Tambahan', report.note),
+            ],
           ],
         ),
       ),
@@ -265,6 +412,23 @@ class _GuruSpReportPageState extends State<GuruSpReportPage> {
     );
   }
 
+  Future<void> _navigateToForm({bool isEditing = false, Map<String, dynamic>? initialData}) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GuruSpFormPage(
+          isEditing: isEditing,
+          initialData: initialData,
+          studentData: widget.studentData,
+        ),
+      ),
+    );
+    // Refresh jika kembali dengan result true (berhasil simpan)
+    if (result == true && mounted) {
+      _loadReports();
+    }
+  }
+
   Widget _buildBottomActions(BuildContext context) {
     final hasSelection = _selectedReportIndex != null;
 
@@ -285,32 +449,48 @@ class _GuruSpReportPageState extends State<GuruSpReportPage> {
       child: SafeArea(
         child: Row(
           children: [
+            // Tombol hapus (hanya muncul saat ada yang dipilih)
+            if (hasSelection) ...[
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _deleteReport(_reports[_selectedReportIndex!]);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.red.shade400,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: GestureDetector(
                 onTap: () {
                   HapticFeedback.lightImpact();
                   if (hasSelection) {
-                    final selectedData = dummyReports[_selectedReportIndex!];
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => GuruSpFormPage(
-                          isEditing: true,
-                          initialData: selectedData,
-                          studentData: widget.studentData,
-                        ),
-                      ),
+                    final selected = _reports[_selectedReportIndex!];
+                    _navigateToForm(
+                      isEditing: true,
+                      initialData: {
+                        'id': selected.id,
+                        'date': selected.date,
+                        'jenis_sp': selected.jenisSp,
+                        'alasan': selected.alasan,
+                        'tindakan': selected.tindakan,
+                        'note': selected.note,
+                      },
                     );
                   } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => GuruSpFormPage(
-                          isEditing: false,
-                          studentData: widget.studentData,
-                        ),
-                      ),
-                    );
+                    _navigateToForm();
                   }
                 },
                 child: AnimatedContainer(

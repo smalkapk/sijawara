@@ -695,13 +695,6 @@ class _PointAnimationOverlayState extends State<_PointAnimationOverlay>
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF10B981).withOpacity(0.5),
-            blurRadius: 28,
-            spreadRadius: 6,
-          ),
-        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -769,13 +762,6 @@ class _PointAnimationOverlayState extends State<_PointAnimationOverlay>
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: phase.sparkleColor.withOpacity(0.5),
-            blurRadius: 28,
-            spreadRadius: 6,
-          ),
-        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

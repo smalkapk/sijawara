@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
-import '../services/guru_sp_service.dart';
-import 'guru_sp_report_page.dart';
+import '../services/guru_ibadah_service.dart';
+import 'guru_ibadah_calendar_page.dart';
 
-class GuruSpStudentListPage extends StatefulWidget {
-  const GuruSpStudentListPage({super.key});
+class GuruIbadahStudentListPage extends StatefulWidget {
+  const GuruIbadahStudentListPage({super.key});
 
   @override
-  State<GuruSpStudentListPage> createState() =>
-      _GuruSpStudentListPageState();
+  State<GuruIbadahStudentListPage> createState() =>
+      _GuruIbadahStudentListPageState();
 }
 
-class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
-  List<GuruSpStudent> _allStudents = [];
-  List<GuruSpStudent> _filteredStudents = [];
+class _GuruIbadahStudentListPageState extends State<GuruIbadahStudentListPage> {
+  List<GuruIbadahStudent> _allStudents = [];
+  List<GuruIbadahStudent> _filteredStudents = [];
   bool _isLoading = true;
   String? _errorMessage;
   final _searchController = TextEditingController();
@@ -53,7 +53,7 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
       _errorMessage = null;
     });
     try {
-      final students = await GuruSpService.getStudents();
+      final students = await GuruIbadahService.getStudents();
       if (mounted) {
         setState(() {
           _allStudents = students;
@@ -124,9 +124,9 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
                 Row(
                   children: [
                     Icon(
-                      Icons.people_alt_rounded,
+                      Icons.mosque_rounded,
                       size: 14,
-                      color: AppTheme.gold,
+                      color: AppTheme.softPurple,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -140,7 +140,7 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'SP Siswa',
+                  'Monitoring Ibadah',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
@@ -169,7 +169,8 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 48, color: AppTheme.grey400),
+            Icon(Icons.error_outline_rounded,
+                size: 48, color: AppTheme.grey400),
             const SizedBox(height: 12),
             Text(
               _errorMessage!,
@@ -183,7 +184,8 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
             GestureDetector(
               onTap: _loadStudents,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                 decoration: BoxDecoration(
                   gradient: AppTheme.mainGradient,
                   borderRadius: BorderRadius.circular(12),
@@ -207,7 +209,8 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.people_outline_rounded, size: 48, color: AppTheme.grey400),
+            Icon(Icons.people_outline_rounded,
+                size: 48, color: AppTheme.grey400),
             const SizedBox(height: 12),
             Text(
               _searchController.text.isNotEmpty
@@ -284,15 +287,17 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
     );
   }
 
-  Widget _buildStudentCard(GuruSpStudent student) {
+  Widget _buildStudentCard(GuruIbadahStudent student) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => GuruSpReportPage(
-              studentData: student.toMap(),
+            builder: (_) => GuruIbadahCalendarPage(
+              studentId: student.studentId,
+              studentName: student.name,
+              className: student.className,
             ),
           ),
         );
@@ -311,7 +316,7 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withOpacity(0.1),
+                color: AppTheme.softPurple.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -320,7 +325,7 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: AppTheme.primaryGreen,
+                    color: AppTheme.softPurple,
                   ),
                 ),
               ),
@@ -338,10 +343,32 @@ class _GuruSpStudentListPageState extends State<GuruSpStudentListPage> {
                       color: AppTheme.textPrimary,
                     ),
                   ),
+                  if (student.className.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      student.className,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.grey400,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppTheme.grey400),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.softPurple.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.calendar_month_rounded,
+                color: AppTheme.softPurple,
+                size: 18,
+              ),
+            ),
           ],
         ),
       ),

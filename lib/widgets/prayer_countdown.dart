@@ -450,7 +450,7 @@ class _PrayerCountdownState extends State<PrayerCountdown>
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(28),
-          boxShadow: AppTheme.cardShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           children: [
@@ -563,15 +563,8 @@ class _PrayerCountdownState extends State<PrayerCountdown>
         return Container(
           width: 68,
           height: 68,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryGreen.withOpacity(glow),
-                blurRadius: 20,
-                spreadRadius: 0,
-              ),
-            ],
           ),
           child: child,
         );
@@ -733,7 +726,6 @@ class _PrayerCountdownState extends State<PrayerCountdown>
               decoration: BoxDecoration(
                 gradient: AppTheme.mainGradient,
                 borderRadius: BorderRadius.circular(10),
-                boxShadow: AppTheme.greenGlow,
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,

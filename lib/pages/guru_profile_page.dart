@@ -174,7 +174,7 @@ class _GuruProfilePageState extends State<GuruProfilePage> {
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           children: [

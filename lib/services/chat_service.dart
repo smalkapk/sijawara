@@ -22,6 +22,9 @@ class ChatMessage {
   final String? attachmentUrl;
   final String? attachmentName;
   final int? attachmentSize;
+  final int? replyToMessageId;
+  final String? replyPreview;
+  final int? replySenderId;
 
   ChatMessage({
     required this.id,
@@ -35,6 +38,9 @@ class ChatMessage {
     this.attachmentUrl,
     this.attachmentName,
     this.attachmentSize,
+    this.replyToMessageId,
+    this.replyPreview,
+    this.replySenderId,
   });
 
   bool get hasAttachment => attachmentType != AttachmentType.none;
@@ -83,18 +89,29 @@ class ChatMessage {
       attachmentName: json['attachment_name'] as String?,
       attachmentSize: json['attachment_size'] != null
           ? (json['attachment_size'] is int
-              ? json['attachment_size']
-              : int.tryParse(json['attachment_size'].toString()))
+                ? json['attachment_size']
+                : int.tryParse(json['attachment_size'].toString()))
+          : null,
+      replyToMessageId: json['reply_to_message_id'] != null
+          ? (json['reply_to_message_id'] is int
+                ? json['reply_to_message_id']
+                : int.tryParse(json['reply_to_message_id'].toString()))
+          : null,
+      replyPreview: json['reply_preview'] as String?,
+      replySenderId: json['reply_sender_id'] != null
+          ? (json['reply_sender_id'] is int
+                ? json['reply_sender_id']
+                : int.tryParse(json['reply_sender_id'].toString()))
           : null,
     );
   }
 
-  ChatMessage copyWith({bool? isRead}) {
+  ChatMessage copyWith({bool? isRead, String? message}) {
     return ChatMessage(
       id: id,
       senderId: senderId,
       receiverId: receiverId,
-      message: message,
+      message: message ?? this.message,
       isMe: isMe,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt,
@@ -102,6 +119,9 @@ class ChatMessage {
       attachmentUrl: attachmentUrl,
       attachmentName: attachmentName,
       attachmentSize: attachmentSize,
+      replyToMessageId: replyToMessageId,
+      replyPreview: replyPreview,
+      replySenderId: replySenderId,
     );
   }
 }
@@ -130,7 +150,8 @@ class GuruKelasInfo {
       guruName: json['guru_name'] as String? ?? '',
       guruAvatar: json['guru_avatar'] as String?,
       className: json['class_name'] as String? ?? '',
-      children: (json['children'] as List<dynamic>?)
+      children:
+          (json['children'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
@@ -201,31 +222,37 @@ class ChatService {
   /// Wali: Ambil info guru kelas
   static Future<GuruKelasInfo> getGuruInfo() async {
     final token = await AuthService.getToken();
-    final response = await http.get(
-      Uri.parse('$_baseUrl/chat.php?action=guru_info'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    ).timeout(const Duration(seconds: 15));
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/chat.php?action=guru_info'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['success'] == true) {
       return GuruKelasInfo.fromJson(body['data'] as Map<String, dynamic>);
     }
-    throw Exception(body['message'] ?? 'Gagal mendapatkan info guru');
+    final debugInfo = body['debug'];
+    final msg = body['message'] ?? 'Gagal mendapatkan info guru';
+    throw Exception(debugInfo != null ? '$msg ($debugInfo)' : msg);
   }
 
   /// Guru: Ambil daftar kontak wali
   static Future<List<WaliContact>> getContacts() async {
     final token = await AuthService.getToken();
-    final response = await http.get(
-      Uri.parse('$_baseUrl/chat.php?action=contacts'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    ).timeout(const Duration(seconds: 15));
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/chat.php?action=contacts'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['success'] == true) {
@@ -234,7 +261,9 @@ class ChatService {
           .map((e) => WaliContact.fromJson(e as Map<String, dynamic>))
           .toList();
     }
-    throw Exception(body['message'] ?? 'Gagal mendapatkan kontak');
+    final debugInfo = body['debug'];
+    final msg = body['message'] ?? 'Gagal mendapatkan kontak';
+    throw Exception(debugInfo != null ? '$msg ($debugInfo)' : msg);
   }
 
   /// Ambil riwayat chat
@@ -250,13 +279,15 @@ class ChatService {
       url += '&before_id=$beforeId';
     }
 
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    ).timeout(const Duration(seconds: 15));
+    final response = await http
+        .get(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (body['success'] == true) {
@@ -265,13 +296,16 @@ class ChatService {
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
           .toList();
     }
-    throw Exception(body['message'] ?? 'Gagal mendapatkan riwayat chat');
+    final debugInfo = body['debug'];
+    final msg = body['message'] ?? 'Gagal mendapatkan riwayat chat';
+    throw Exception(debugInfo != null ? '$msg ($debugInfo)' : msg);
   }
 
   /// Kirim pesan via HTTP (fallback)
   static Future<ChatMessage> sendMessageHttp({
     required int receiverId,
     required String message,
+    int? replyToMessageId,
   }) async {
     final token = await AuthService.getToken();
     final response = await http
@@ -284,6 +318,8 @@ class ChatService {
           body: jsonEncode({
             'receiver_id': receiverId,
             'message': message,
+            if (replyToMessageId != null)
+              'reply_to_message_id': replyToMessageId,
           }),
         )
         .timeout(const Duration(seconds: 15));
@@ -301,6 +337,7 @@ class ChatService {
     required File file,
     required String attachmentType, // 'image' atau 'document'
     String message = '',
+    int? replyToMessageId,
   }) async {
     final token = await AuthService.getToken();
     final uri = Uri.parse('$_baseUrl/chat.php?action=upload');
@@ -310,10 +347,14 @@ class ChatService {
     request.fields['receiver_id'] = receiverId.toString();
     request.fields['message'] = message;
     request.fields['attachment_type'] = attachmentType;
+    if (replyToMessageId != null) {
+      request.fields['reply_to_message_id'] = replyToMessageId.toString();
+    }
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
-    final streamedResponse =
-        await request.send().timeout(const Duration(seconds: 60));
+    final streamedResponse = await request.send().timeout(
+      const Duration(seconds: 60),
+    );
     final response = await http.Response.fromStream(streamedResponse);
 
     final rawBody = response.body.trim();
@@ -348,17 +389,36 @@ class ChatService {
   /// Tandai pesan dibaca via HTTP
   static Future<void> markReadHttp({required int partnerId}) async {
     final token = await AuthService.getToken();
-    await http.post(
-      Uri.parse('$_baseUrl/chat.php?action=mark_read'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'partner_id': partnerId}),
-    ).timeout(const Duration(seconds: 15));
+    await http
+        .post(
+          Uri.parse('$_baseUrl/chat.php?action=mark_read'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'partner_id': partnerId}),
+        )
+        .timeout(const Duration(seconds: 15));
   }
 
-  /// Ambil user_id saat ini
+  /// Hapus pesan (soft delete – set message = 'deleted')
+  static Future<void> deleteMessage({required int messageId}) async {
+    final token = await AuthService.getToken();
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/chat.php?action=delete'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'message_id': messageId}),
+        )
+        .timeout(const Duration(seconds: 15));
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['success'] != true) {
+      throw Exception(body['message'] ?? 'Gagal menghapus pesan');
+    }
+  }
   static Future<int> getCurrentUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('user_id') ?? 0;
@@ -452,39 +512,42 @@ class ChatWebSocket {
     String? attachmentUrl,
     String? attachmentName,
     int? attachmentSize,
+    int? replyToMessageId,
   }) {
     if (!_isConnected || _socket == null) {
       debugPrint('[ChatWS] Not connected, cannot send');
       return;
     }
-    _socket!.add(jsonEncode({
-      'type': 'message',
-      'receiver_id': receiverId,
-      'message': message,
-      if (attachmentType != 'none') 'attachment_type': attachmentType,
-      if (attachmentUrl != null) 'attachment_url': attachmentUrl,
-      if (attachmentName != null) 'attachment_name': attachmentName,
-      if (attachmentSize != null) 'attachment_size': attachmentSize,
-    }));
+    _socket!.add(
+      jsonEncode({
+        'type': 'message',
+        'receiver_id': receiverId,
+        'message': message,
+        if (attachmentType != 'none') 'attachment_type': attachmentType,
+        if (attachmentUrl != null) 'attachment_url': attachmentUrl,
+        if (attachmentName != null) 'attachment_name': attachmentName,
+        if (attachmentSize != null) 'attachment_size': attachmentSize,
+        if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+      }),
+    );
   }
 
   /// Tandai pesan dibaca
   void markRead({required int partnerId}) {
     if (!_isConnected || _socket == null) return;
-    _socket!.add(jsonEncode({
-      'type': 'read',
-      'partner_id': partnerId,
-    }));
+    _socket!.add(jsonEncode({'type': 'read', 'partner_id': partnerId}));
   }
 
   /// Kirim typing indicator
   void sendTyping({required int partnerId, required bool isTyping}) {
     if (!_isConnected || _socket == null) return;
-    _socket!.add(jsonEncode({
-      'type': 'typing',
-      'partner_id': partnerId,
-      'is_typing': isTyping,
-    }));
+    _socket!.add(
+      jsonEncode({
+        'type': 'typing',
+        'partner_id': partnerId,
+        'is_typing': isTyping,
+      }),
+    );
   }
 
   /// Notify attachment ke penerima (broadcast only, tanpa insert DB)
@@ -497,19 +560,39 @@ class ChatWebSocket {
     String? attachmentName,
     int? attachmentSize,
     String? createdAt,
+    int? replyToMessageId,
+    String? replyPreview,
+    int? replySenderId,
   }) {
     if (!_isConnected || _socket == null) return;
-    _socket!.add(jsonEncode({
-      'type': 'notify',
-      'id': id,
-      'receiver_id': receiverId,
-      'message': message,
-      'attachment_type': attachmentType,
-      if (attachmentUrl != null) 'attachment_url': attachmentUrl,
-      if (attachmentName != null) 'attachment_name': attachmentName,
-      if (attachmentSize != null) 'attachment_size': attachmentSize,
-      if (createdAt != null) 'created_at': createdAt,
-    }));
+    _socket!.add(
+      jsonEncode({
+        'type': 'notify',
+        'id': id,
+        'receiver_id': receiverId,
+        'message': message,
+        'attachment_type': attachmentType,
+        if (attachmentUrl != null) 'attachment_url': attachmentUrl,
+        if (attachmentName != null) 'attachment_name': attachmentName,
+        if (attachmentSize != null) 'attachment_size': attachmentSize,
+        if (createdAt != null) 'created_at': createdAt,
+        if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
+        if (replyPreview != null) 'reply_preview': replyPreview,
+        if (replySenderId != null) 'reply_sender_id': replySenderId,
+      }),
+    );
+  }
+
+  /// Broadcast penghapusan pesan ke partner via WS
+  void deleteMessageWs({required int messageId, required int receiverId}) {
+    if (!_isConnected || _socket == null) return;
+    _socket!.add(
+      jsonEncode({
+        'type': 'delete_message',
+        'message_id': messageId,
+        'receiver_id': receiverId,
+      }),
+    );
   }
 
   void _scheduleReconnect() {
@@ -518,7 +601,8 @@ class ChatWebSocket {
     final delay = Duration(seconds: 2 * (_reconnectAttempts + 1));
     _reconnectAttempts++;
     debugPrint(
-        '[ChatWS] Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts)');
+      '[ChatWS] Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts)',
+    );
     _reconnectTimer = Timer(delay, connect);
   }
 

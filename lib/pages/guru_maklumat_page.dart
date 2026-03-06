@@ -309,7 +309,6 @@ class _GuruMaklumatPageState extends State<GuruMaklumatPage>
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         border: Border.all(color: AppTheme.grey100, width: 1),
-        boxShadow: AppTheme.softShadow,
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -320,123 +319,110 @@ class _GuruMaklumatPageState extends State<GuruMaklumatPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Article Content
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header (Category & Date)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_today_rounded,
-                              size: 14,
-                              color: AppTheme.grey400,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              item.formattedDate,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: item.categoryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            item.kategori.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: item.categoryColor,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Title with custom icon
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.only(top: 2),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: item.iconColor.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            item.iconData,
-                            color: item.iconColor,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            item.judul,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimary,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Excerpt
+                    // Header Title
                     Text(
-                      item.deskripsi,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                      item.judul,
                       style: const TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
-                        height: 1.5,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                        height: 1.25,
                       ),
                     ),
                     const SizedBox(height: 10),
 
-                    // Target audience badge
-                    Row(
+                    // Badges row: Info | Tanggal | Kepada (wrap to next line when needed)
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.start,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(
-                          _getTargetIcon(item.targetAudience),
-                          size: 14,
-                          color: AppTheme.grey400,
+                        // Info / Category badge (smaller)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: item.categoryColor.withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            item.kategori,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: item.categoryColor,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Kepada: ${_getTargetLabel(item.targetAudience)}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.grey400,
+
+                        // Date badge (smaller)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.grey100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.calendar_today_rounded, size: 10, color: AppTheme.textSecondary),
+                              const SizedBox(width: 3),
+                              Text(
+                                item.formattedDate,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Target audience badge -> icon + label (smaller)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.grey100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getTargetIcon(item.targetAudience),
+                                size: 11,
+                                color: AppTheme.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _getTargetLabel(item.targetAudience),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Content / Excerpt
+                    Text(
+                      item.deskripsi,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                        height: 1.6,
+                      ),
                     ),
                   ],
                 ),
@@ -505,18 +491,30 @@ class _GuruMaklumatPageState extends State<GuruMaklumatPage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Category & Date
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // Title as in card + badges row
+                      Text(
+                        item.judul,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Badges same as card (wrap)
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.start,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: item.categoryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
+                              color: item.categoryColor.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               item.kategori.toUpperCase(),
@@ -524,64 +522,59 @@ class _GuruMaklumatPageState extends State<GuruMaklumatPage>
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
                                 color: item.categoryColor,
-                                letterSpacing: 0.5,
                               ),
                             ),
                           ),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_rounded,
-                                size: 14,
-                                color: AppTheme.grey400,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                item.formattedDate,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Title with icon
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: item.iconColor.withOpacity(0.1),
-                              shape: BoxShape.circle,
+                              color: AppTheme.grey100,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(
-                              item.iconData,
-                              color: item.iconColor,
-                              size: 22,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.calendar_today_rounded, size: 10, color: AppTheme.textSecondary),
+                                const SizedBox(width: 3),
+                                Text(
+                                  item.formattedDate,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              item.judul,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textPrimary,
-                                height: 1.3,
-                              ),
+
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.grey100,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_getTargetIcon(item.targetAudience), size: 11, color: AppTheme.textSecondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _getTargetLabel(item.targetAudience),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Content
                       Text(
                         item.deskripsi,
@@ -589,35 +582,6 @@ class _GuruMaklumatPageState extends State<GuruMaklumatPage>
                           fontSize: 14,
                           color: AppTheme.textSecondary,
                           height: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Target audience info
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _getTargetIcon(item.targetAudience),
-                              size: 16,
-                              color: AppTheme.primaryGreen,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Dikirim kepada: ${_getTargetLabel(item.targetAudience)}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.primaryGreen,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                       const SizedBox(height: 24),

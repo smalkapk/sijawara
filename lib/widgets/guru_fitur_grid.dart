@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../pages/guru_alka_ai_page.dart';
-import '../pages/guru_bantuan_page.dart';
 import '../pages/guru_sp_student_list_page.dart';
 import '../pages/guru_evaluasi_list_page.dart';
+import '../pages/guru_ibadah_student_list_page.dart';
 
 class GuruFiturGrid extends StatelessWidget {
   const GuruFiturGrid({super.key});
@@ -17,7 +17,10 @@ class GuruFiturGrid extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        boxShadow: AppTheme.cardShadow,
+        border: Border.all(
+        color: AppTheme.grey100,
+        width: 1,
+      ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,15 +103,15 @@ class GuruFiturGrid extends StatelessWidget {
                     },
                   ),
                   buildGridItem(
-                    'Bantuan',
-                    Icons.help_outline_rounded,
-                    AppTheme.gold,
+                    'Ibadah',
+                    Icons.mosque,
+                    AppTheme.softPurple,
                     onTap: () {
                       HapticFeedback.lightImpact();
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const GuruBantuanPage(),
+                          builder: (_) => const GuruIbadahStudentListPage(),
                         ),
                       );
                     },

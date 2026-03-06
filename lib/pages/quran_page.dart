@@ -305,26 +305,12 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
           gradient: AppTheme.mainGradient,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryGreen.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         dividerHeight: 0,
@@ -532,13 +518,6 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
             color: AppTheme.primaryGreen.withOpacity(0.15),
             width: 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,13 +648,6 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: TextField(
           controller: _searchController,
@@ -801,10 +773,58 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
   // ══════════════════════════════════════════
   Widget _buildProgressTab() {
     if (_isLoadingSetoran) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 80),
-          child: CircularProgressIndicator(),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Summary card skeleton
+              Container(
+                height: 140,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppTheme.grey200.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Stats row skeleton
+              Row(
+                children: List.generate(4, (index) => Expanded(
+                  child: Container(
+                    height: 85,
+                    margin: EdgeInsets.only(right: index < 3 ? 8 : 0),
+                    decoration: BoxDecoration(
+                      color: AppTheme.grey200.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                )),
+              ),
+              const SizedBox(height: 24),
+              // Label skeleton
+              Container(
+                height: 20,
+                width: 150,
+                decoration: BoxDecoration(
+                  color: AppTheme.grey200.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // List item skeletons
+              ...List.generate(3, (index) => Container(
+                height: 160,
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.grey200.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              )),
+            ],
+          ),
         ),
       );
     }
@@ -917,7 +937,6 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
       decoration: BoxDecoration(
         gradient: AppTheme.mainGradient,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.greenGlow,
       ),
       child: Column(
         children: [
@@ -1086,13 +1105,6 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
           children: [
@@ -1248,71 +1260,8 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
                           final setoran = list[index];
                           final dateFormat = DateFormat('dd MMM yyyy', 'id_ID');
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppTheme.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: AppTheme.softShadow,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: color.withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    Icons.auto_stories_rounded,
-                                    size: 20,
-                                    color: color,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'QS. ${setoran.surahName}',
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppTheme.textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Ayat ${setoran.ayatFrom} - ${setoran.ayatTo}  •  ${dateFormat.format(setoran.setoranAt)}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppTheme.grey400,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: color.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    setoran.grade,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: color,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
+                          // Re-use the main setoran card widget for consistency
+                          return _buildSetoranCard(setoran, index, list.length - index);
                         },
                       ),
               ),
@@ -1363,36 +1312,29 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
     );
   }
 
+  // ── Grade color helper ──
+  Color _gradeColor(String grade) {
+    switch (grade) {
+      case 'A':
+        return const Color(0xFF059669);
+      case 'B+':
+      case 'B':
+        return AppTheme.softBlue;
+      case 'C':
+        return AppTheme.gold;
+      case 'D':
+        return const Color(0xFFEF4444);
+      default:
+        return AppTheme.grey400;
+    }
+  }
+
   // ── Setoran Card ──
   Widget _buildSetoranCard(TahfidzSetoran setoran, int animIndex, int setoranNo) {
     final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
     final formattedDate = dateFormat.format(setoran.setoranAt);
-
-    // Nilai badge color
-    Color nilaiColor;
-    switch (setoran.grade) {
-      case 'A':
-        nilaiColor = const Color(0xFF059669);
-        break;
-      case 'B+':
-      case 'B':
-        nilaiColor = AppTheme.softBlue;
-        break;
-      case 'C':
-        nilaiColor = AppTheme.gold;
-        break;
-      case 'D':
-        nilaiColor = const Color(0xFFEF4444);
-        break;
-      default:
-        nilaiColor = AppTheme.grey400;
-    }
-
-    // Setoran range text
-    final setoranRange =
-        'QS. ${setoran.surahName}: ${setoran.ayatFrom} — ${setoran.ayatTo}';
-
     final sudahParaf = setoran.guruName.isNotEmpty;
+    final items = setoran.items;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -1412,230 +1354,129 @@ class _QuranPageState extends State<QuranPage> with TickerProviderStateMixin, Au
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Date header strip ──
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: AppTheme.mainGradient,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
+            // ── Header row ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Nomor urut
-                  Container(
-                    width: 24,
-                    height: 24,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Text(
-                      '$setoranNo',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    color: Colors.white70,
-                    size: 13,
-                  ),
-                  const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      formattedDate,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                  // Nilai badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      setoran.grade,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: nilaiColor,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Setoran $setoranNo',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          formattedDate,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.grey400,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
 
-            // ── Content ──
+            // ── Divider ──
+            Container(height: 1, color: AppTheme.grey100),
+
+            // ── Surah item list ──
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Setoran range
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.auto_stories_rounded,
-                          size: 16,
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Setoran',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              setoranRange,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-                  Container(height: 1, color: AppTheme.grey100),
-                  const SizedBox(height: 12),
-
-                  // Nilai & Paraf row
-                  Row(
-                    children: [
-                      // Nilai
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: nilaiColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.grade_rounded,
-                          size: 16,
-                          color: nilaiColor,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Nilai',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.grey400,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          Text(
-                            setoran.grade,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: nilaiColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      // Paraf guru
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: sudahParaf
-                              ? AppTheme.primaryGreen.withValues(alpha: 0.08)
-                              : AppTheme.gold.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          sudahParaf
-                              ? Icons.verified_rounded
-                              : Icons.pending_rounded,
-                          size: 16,
-                          color: sudahParaf
-                              ? AppTheme.primaryGreen
-                              : AppTheme.gold,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Paraf Guru',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.grey400,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          Text(
-                            sudahParaf
-                                ? (setoran.guruName.isNotEmpty ? setoran.guruName : 'Sudah')
-                                : 'Menunggu',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: sudahParaf
-                                  ? AppTheme.primaryGreen
-                                  : AppTheme.gold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                  for (int i = 0; i < items.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 6),
+                    _buildSetoranItemRow(items[i]),
+                  ],
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Single surah item row inside a setoran card ──
+  Widget _buildSetoranItemRow(SetoranItem item) {
+    final gColor = _gradeColor(item.grade);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.menu_book_rounded,
+                color: AppTheme.primaryGreen, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.surahName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Ayat ${item.ayatFrom} - ${item.ayatTo}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.grey400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Grade badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: gColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              item.grade,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: gColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

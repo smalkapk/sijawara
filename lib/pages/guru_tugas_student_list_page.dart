@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../widgets/skeleton_loader.dart';
 import '../services/guru_tugas_service.dart';
 import 'guru_tugas_report_page.dart';
 
@@ -82,11 +83,61 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
             _buildSearchFilter(),
             Expanded(
               child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                          color: AppTheme.primaryGreen),
-                    )
-                  : _filteredStudents.isEmpty
+                    ? ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 8),
+                        itemCount: 6,
+                        itemBuilder: (context, index) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.white,
+                              borderRadius:
+                                  BorderRadius.circular(AppTheme.radiusMd),
+                              border: Border.all(
+                                  color: AppTheme.grey100, width: 1),
+                            ),
+                            child: Row(
+                              children: [
+                                SkeletonLoader(
+                                  height: 44,
+                                  width: 44,
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const SkeletonLoader(
+                                          height: 16, width: double.infinity),
+                                      const SizedBox(height: 8),
+                                      SkeletonLoader(
+                                        height: 12,
+                                        width: 120,
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SkeletonLoader(
+                                  height: 24,
+                                  width: 24,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      )
+                    : _filteredStudents.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -286,20 +337,19 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
           _loadStudents();
         });
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.softShadow,
           border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Row(
           children: [
             Container(
-              width: 50,
-              height: 50,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppTheme.softPurple.withOpacity(0.1),
                 shape: BoxShape.circle,
@@ -308,7 +358,7 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
                 child: Text(
                   student.name.isNotEmpty ? student.name[0] : '?',
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.softPurple,
                   ),
@@ -323,18 +373,9 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
                   Text(
                     student.name,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'NIS: ${student.nis}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],

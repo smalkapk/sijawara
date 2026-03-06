@@ -427,13 +427,7 @@ class _ProfilePageState extends State<ProfilePage>
           indicator: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(11),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           indicatorSize: TabBarIndicatorSize.tab,
           dividerColor: Colors.transparent,
@@ -680,7 +674,7 @@ class _ProfilePageState extends State<ProfilePage>
                 decoration: BoxDecoration(
                   color: AppTheme.white,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppTheme.softShadow,
+                  border: Border.all(color: AppTheme.grey100, width: 1),
                 ),
                 child: Column(
                   children: [
@@ -791,7 +785,7 @@ class _ProfilePageState extends State<ProfilePage>
         decoration: BoxDecoration(
           gradient: AppTheme.mainGradient,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: AppTheme.greenGlow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           children: [
@@ -1099,7 +1093,7 @@ class _ProfilePageState extends State<ProfilePage>
         decoration: BoxDecoration(
           gradient: AppTheme.mainGradient,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: AppTheme.greenGlow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: _isLoading
             ? Row(
@@ -1200,7 +1194,7 @@ class _ProfilePageState extends State<ProfilePage>
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           children: [
@@ -1363,7 +1357,7 @@ class _ProfilePageState extends State<ProfilePage>
             decoration: BoxDecoration(
               color: AppTheme.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: AppTheme.softShadow,
+              border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1459,15 +1453,8 @@ class _ProfilePageState extends State<ProfilePage>
                                                 end: Alignment.topCenter,
                                               ),
                                         borderRadius: BorderRadius.circular(isMonthly ? 4 : 8),
-                                        boxShadow: isToday
-                                            ? [
-                                                BoxShadow(
-                                                  color: AppTheme.primaryGreen
-                                                      .withOpacity(0.3),
-                                                  blurRadius: 6,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ]
+                                        border: isToday
+                                            ? Border.all(color: AppTheme.grey100, width: 1)
                                             : null,
                                       ),
                                     );
@@ -1555,10 +1542,7 @@ class _ProfilePageState extends State<ProfilePage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.softShadow,
-        border: badge.isAchieved
-            ? null
-            : Border.all(color: AppTheme.grey100, width: 1),
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         children: [
@@ -1568,14 +1552,8 @@ class _ProfilePageState extends State<ProfilePage>
               gradient: badge.isAchieved ? badge.gradient : null,
               color: badge.isAchieved ? null : AppTheme.grey100,
               borderRadius: BorderRadius.circular(14),
-              boxShadow: badge.isAchieved
-                  ? [
-                      BoxShadow(
-                        color: badge.gradient.colors.first.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ]
+              border: badge.isAchieved
+                  ? Border.all(color: AppTheme.grey100, width: 1)
                   : null,
             ),
             child: Icon(
@@ -1640,7 +1618,7 @@ class _ProfilePageState extends State<ProfilePage>
             decoration: BoxDecoration(
               color: AppTheme.white,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: AppTheme.softShadow,
+              border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: Column(
               children: [
@@ -1664,8 +1642,8 @@ class _ProfilePageState extends State<ProfilePage>
                 _buildDivider(),
                 _buildSettingItem(
                   icon: Icons.lock_outline_rounded,
-                  iconColor: AppTheme.softBlue,
-                  iconBg: AppTheme.softBlue.withOpacity(0.1),
+                  iconColor: AppTheme.primaryGreen,
+                  iconBg: AppTheme.primaryGreen.withOpacity(0.1),
                   title: 'Ubah Password',
                   subtitle: 'Ganti kata sandi akun',
                   onTap: () {
@@ -1681,8 +1659,8 @@ class _ProfilePageState extends State<ProfilePage>
                 _buildDivider(),
                 _buildSettingItem(
                   icon: Icons.notifications_none_rounded,
-                  iconColor: AppTheme.gold,
-                  iconBg: AppTheme.gold.withOpacity(0.1),
+                  iconColor: AppTheme.primaryGreen,
+                  iconBg: AppTheme.primaryGreen.withOpacity(0.1),
                   title: 'Notifikasi',
                   subtitle: 'Atur pengingat shalat & ibadah',
                   onTap: () {
@@ -1695,28 +1673,12 @@ class _ProfilePageState extends State<ProfilePage>
                     );
                   },
                 ),
-                _buildDivider(),
-                _buildSettingItem(
-                  icon: Icons.palette_outlined,
-                  iconColor: AppTheme.softPurple,
-                  iconBg: AppTheme.softPurple.withOpacity(0.1),
-                  title: 'Tampilan',
-                  subtitle: 'Tema & ukuran font',
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const DisplaySettingsPage(),
-                      ),
-                    );
-                  },
-                ),
+
                 _buildDivider(),
                 _buildSettingItem(
                   icon: Icons.info_outline_rounded,
-                  iconColor: AppTheme.teal,
-                  iconBg: AppTheme.teal.withOpacity(0.1),
+                  iconColor: AppTheme.primaryGreen,
+                  iconBg: AppTheme.primaryGreen.withOpacity(0.1),
                   title: 'Tentang Aplikasi',
                   subtitle: 'Versi 1.0.0',
                   onTap: () {
@@ -1745,11 +1707,7 @@ class _ProfilePageState extends State<ProfilePage>
               decoration: BoxDecoration(
                 color: AppTheme.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: AppTheme.softShadow,
-                border: Border.all(
-                  color: const Color(0xFFEF4444).withOpacity(0.2),
-                  width: 1,
-                ),
+                border: Border.all(color: AppTheme.grey100, width: 1),
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2001,7 +1959,7 @@ class _StudentDetailSheetState extends State<_StudentDetailSheet> {
                   decoration: BoxDecoration(
                     gradient: AppTheme.mainGradient,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: AppTheme.greenGlow,
+                    border: Border.all(color: AppTheme.grey100, width: 1),
                   ),
                   child: Column(
                     children: [
@@ -2135,7 +2093,7 @@ class _StudentDetailSheetState extends State<_StudentDetailSheet> {
                       decoration: BoxDecoration(
                         color: AppTheme.white,
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: AppTheme.softShadow,
+                        border: Border.all(color: AppTheme.grey100, width: 1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

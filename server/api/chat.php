@@ -221,12 +221,17 @@ switch ($action) {
         }
 
         $sql = '
-            SELECT id, sender_id, receiver_id, message,
-                   attachment_type, attachment_url, attachment_name, attachment_size,
-                   is_read, created_at
+             SELECT chat_messages.id, chat_messages.sender_id, chat_messages.receiver_id, chat_messages.message,
+                 chat_messages.attachment_type, chat_messages.attachment_url, chat_messages.attachment_name, chat_messages.attachment_size,
+                 chat_messages.reply_to_message_id,
+                   rm.message AS reply_message,
+                   rm.attachment_type AS reply_attachment_type,
+                   rm.sender_id AS reply_sender_id,
+                 chat_messages.is_read, chat_messages.created_at
             FROM chat_messages
-            WHERE ((sender_id = :uid AND receiver_id = :pid)
-                OR (sender_id = :pid2 AND receiver_id = :uid2))
+            LEFT JOIN chat_messages rm ON rm.id = chat_messages.reply_to_message_id
+             WHERE ((chat_messages.sender_id = :uid AND chat_messages.receiver_id = :pid)
+              OR (chat_messages.sender_id = :pid2 AND chat_messages.receiver_id = :uid2))
         ';
         $params = [
             'uid' => $userId, 'pid' => $partnerId,
@@ -238,7 +243,7 @@ switch ($action) {
             $params['before_id'] = $beforeId;
         }
 
-        $sql .= ' ORDER BY created_at DESC LIMIT :lim';
+        $sql .= ' ORDER BY chat_messages.created_at DESC LIMIT :lim';
 
         $stmt = $pdo->prepare($sql);
         foreach ($params as $k => $v) {
@@ -260,6 +265,13 @@ switch ($action) {
                 'attachment_url' => $m['attachment_url'],
                 'attachment_name' => $m['attachment_name'],
                 'attachment_size' => $m['attachment_size'] ? (int) $m['attachment_size'] : null,
+                'reply_to_message_id' => $m['reply_to_message_id'] ? (int) $m['reply_to_message_id'] : null,
+                'reply_preview' => $m['reply_to_message_id']
+                    ? (($m['reply_attachment_type'] === 'image')
+                        ? '📷 Foto'
+                        : (($m['reply_attachment_type'] === 'document') ? '📄 Dokumen' : ($m['reply_message'] ?? '')))
+                    : null,
+                'reply_sender_id' => $m['reply_sender_id'] ? (int) $m['reply_sender_id'] : null,
                 'is_me' => ((int) $m['sender_id'] === $userId),
                 'is_read' => (bool) $m['is_read'],
                 'created_at' => $m['created_at'],
@@ -303,17 +315,34 @@ switch ($action) {
         $input = json_decode(file_get_contents('php://input'), true);
         $receiverId = (int) ($input['receiver_id'] ?? 0);
         $message = trim($input['message'] ?? '');
+        $replyToMessageId = (int) ($input['reply_to_message_id'] ?? 0);
 
         if ($receiverId <= 0 || $message === '') {
             echo json_encode(['success' => false, 'message' => 'receiver_id dan message diperlukan']);
             exit;
         }
 
+        $replyData = null;
+        if ($replyToMessageId > 0) {
+            $stmtReply = $pdo->prepare('SELECT id, sender_id, message, attachment_type FROM chat_messages WHERE id = :rid LIMIT 1');
+            $stmtReply->execute(['rid' => $replyToMessageId]);
+            $replyData = $stmtReply->fetch();
+            if (!$replyData) {
+                echo json_encode(['success' => false, 'message' => 'Pesan balasan tidak ditemukan']);
+                exit;
+            }
+        }
+
         $stmt = $pdo->prepare('
-            INSERT INTO chat_messages (sender_id, receiver_id, message) 
-            VALUES (:sid, :rid, :msg)
+            INSERT INTO chat_messages (sender_id, receiver_id, message, reply_to_message_id)
+            VALUES (:sid, :rid, :msg, :reply_id)
         ');
-        $stmt->execute(['sid' => $userId, 'rid' => $receiverId, 'msg' => $message]);
+        $stmt->execute([
+            'sid' => $userId,
+            'rid' => $receiverId,
+            'msg' => $message,
+            'reply_id' => $replyToMessageId > 0 ? $replyToMessageId : null,
+        ]);
         $msgId = (int) $pdo->lastInsertId();
 
         echo json_encode([
@@ -327,6 +356,13 @@ switch ($action) {
                 'attachment_url' => null,
                 'attachment_name' => null,
                 'attachment_size' => null,
+                'reply_to_message_id' => $replyToMessageId > 0 ? $replyToMessageId : null,
+                'reply_preview' => $replyData
+                    ? (($replyData['attachment_type'] === 'image')
+                        ? '📷 Foto'
+                        : (($replyData['attachment_type'] === 'document') ? '📄 Dokumen' : ($replyData['message'] ?? '')))
+                    : null,
+                'reply_sender_id' => $replyData ? (int) $replyData['sender_id'] : null,
                 'is_me' => true,
                 'is_read' => false,
                 'created_at' => date('Y-m-d H:i:s'),
@@ -346,6 +382,7 @@ switch ($action) {
         $receiverId = (int) ($_POST['receiver_id'] ?? 0);
         $message = trim($_POST['message'] ?? '');
         $attachType = $_POST['attachment_type'] ?? 'document'; // image atau document
+        $replyToMessageId = (int) ($_POST['reply_to_message_id'] ?? 0);
 
         if ($receiverId <= 0) {
             echo json_encode(['success' => false, 'message' => 'receiver_id diperlukan']);
@@ -424,10 +461,21 @@ switch ($action) {
 
         $fileUrl = 'https://portal-smalka.com/uploads/chat/' . $filename;
 
+        $replyData = null;
+        if ($replyToMessageId > 0) {
+            $stmtReply = $pdo->prepare('SELECT id, sender_id, message, attachment_type FROM chat_messages WHERE id = :rid LIMIT 1');
+            $stmtReply->execute(['rid' => $replyToMessageId]);
+            $replyData = $stmtReply->fetch();
+            if (!$replyData) {
+                echo json_encode(['success' => false, 'message' => 'Pesan balasan tidak ditemukan']);
+                exit;
+            }
+        }
+
         // Simpan ke DB
         $stmt = $pdo->prepare('
-            INSERT INTO chat_messages (sender_id, receiver_id, message, attachment_type, attachment_url, attachment_name, attachment_size)
-            VALUES (:sid, :rid, :msg, :atype, :aurl, :aname, :asize)
+            INSERT INTO chat_messages (sender_id, receiver_id, message, attachment_type, attachment_url, attachment_name, attachment_size, reply_to_message_id)
+            VALUES (:sid, :rid, :msg, :atype, :aurl, :aname, :asize, :reply_id)
         ');
         $stmt->execute([
             'sid' => $userId,
@@ -437,6 +485,7 @@ switch ($action) {
             'aurl' => $fileUrl,
             'aname' => $file['name'],
             'asize' => (int) $file['size'],
+            'reply_id' => $replyToMessageId > 0 ? $replyToMessageId : null,
         ]);
         $msgId = (int) $pdo->lastInsertId();
 
@@ -451,9 +500,63 @@ switch ($action) {
                 'attachment_url' => $fileUrl,
                 'attachment_name' => $file['name'],
                 'attachment_size' => (int) $file['size'],
+                'reply_to_message_id' => $replyToMessageId > 0 ? $replyToMessageId : null,
+                'reply_preview' => $replyData
+                    ? (($replyData['attachment_type'] === 'image')
+                        ? '📷 Foto'
+                        : (($replyData['attachment_type'] === 'document') ? '📄 Dokumen' : ($replyData['message'] ?? '')))
+                    : null,
+                'reply_sender_id' => $replyData ? (int) $replyData['sender_id'] : null,
                 'is_me' => true,
                 'is_read' => false,
                 'created_at' => date('Y-m-d H:i:s'),
+            ]
+        ]);
+        break;
+
+    // ═══════════════════════════════════════
+    // DELETE: Hapus pesan (soft delete)
+    // ═══════════════════════════════════════
+    case 'delete':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Gunakan POST']);
+            exit;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $messageId = (int) ($input['message_id'] ?? 0);
+
+        if ($messageId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'message_id diperlukan']);
+            exit;
+        }
+
+        // Cek kepemilikan pesan
+        $stmtCheck = $pdo->prepare(
+            'SELECT id, receiver_id FROM chat_messages WHERE id = :mid AND sender_id = :uid LIMIT 1'
+        );
+        $stmtCheck->execute(['mid' => $messageId, 'uid' => $userId]);
+        $msgRow = $stmtCheck->fetch();
+
+        if (!$msgRow) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Pesan tidak ditemukan atau bukan milik Anda']);
+            exit;
+        }
+
+        // Soft delete: update isi jadi 'deleted'
+        $stmtDel = $pdo->prepare(
+            "UPDATE chat_messages SET message = 'deleted', attachment_type = 'none',
+             attachment_url = NULL, attachment_name = NULL, attachment_size = NULL
+             WHERE id = :mid"
+        );
+        $stmtDel->execute(['mid' => $messageId]);
+
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'message_id' => $messageId,
+                'receiver_id' => (int) $msgRow['receiver_id'],
             ]
         ]);
         break;

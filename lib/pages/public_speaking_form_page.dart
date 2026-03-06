@@ -166,7 +166,7 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
                           gradient: AppTheme.mainGradient,
                           borderRadius:
                               BorderRadius.circular(AppTheme.radiusMd),
-                          boxShadow: AppTheme.greenGlow,
+                          border: Border.all(color: AppTheme.grey100, width: 1),
                         ),
                         child: const Center(
                           child: Text(
@@ -372,11 +372,7 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
             decoration: BoxDecoration(
               color: AppTheme.white,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              boxShadow: AppTheme.softShadow,
-              border: Border.all(
-                color: AppTheme.primaryGreen.withOpacity(0.15),
-                width: 1.5,
-              ),
+              border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: Row(
               children: [
@@ -427,11 +423,7 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
-            border: Border.all(
-              color: AppTheme.primaryGreen.withOpacity(0.15),
-              width: 1.5,
-            ),
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: TextField(
             controller: _judulController,
@@ -471,11 +463,7 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
-            border: Border.all(
-              color: AppTheme.primaryGreen.withOpacity(0.15),
-              width: 1.5,
-            ),
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: TextField(
             controller: _materiController,
@@ -516,11 +504,7 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
-            border: Border.all(
-              color: AppTheme.softPurple.withOpacity(0.15),
-              width: 1.5,
-            ),
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: TextField(
             controller: _mentorController,
@@ -561,11 +545,7 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.softShadow,
-            border: Border.all(
-              color: AppTheme.softPurple.withOpacity(0.15),
-              width: 1.5,
-            ),
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: TextField(
             controller: _noteController,
@@ -628,7 +608,7 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
           gradient: _isSaving ? null : AppTheme.mainGradient,
           color: _isSaving ? AppTheme.grey200 : null,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: _isSaving ? [] : AppTheme.greenGlow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

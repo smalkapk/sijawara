@@ -23,7 +23,10 @@ class GuruProfileCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.primaryGreen,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.greenGlow,
+          border: Border.all(
+            color: AppTheme.grey100,
+            width: 1,
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(20),

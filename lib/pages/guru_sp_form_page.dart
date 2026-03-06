@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/guru_sp_service.dart';
 
 class GuruSpFormPage extends StatefulWidget {
   final bool isEditing;
@@ -103,7 +104,11 @@ class _GuruSpFormPageState extends State<GuruSpFormPage>
     }
   }
 
-  void _saveForm() {
+  int get _studentId => widget.studentData['student_id'] is int
+      ? widget.studentData['student_id']
+      : int.tryParse(widget.studentData['student_id']?.toString() ?? '0') ?? 0;
+
+  Future<void> _saveForm() async {
     HapticFeedback.mediumImpact();
     if (_jenisSpController.text.isEmpty || _alasanController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -116,7 +121,6 @@ class _GuruSpFormPageState extends State<GuruSpFormPage>
     }
 
     setState(() => _isSaving = true);
-    // Simulate saving delay
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -125,14 +129,40 @@ class _GuruSpFormPageState extends State<GuruSpFormPage>
       ),
     );
 
-    Future.delayed(const Duration(seconds: 1), () {
+    final spDate =
+        '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+
+    try {
+      if (widget.isEditing && widget.initialData?['id'] != null) {
+        await GuruSpService.updateReport(
+          reportId: widget.initialData!['id'].toString(),
+          studentId: _studentId,
+          spDate: spDate,
+          jenisSp: _jenisSpController.text.trim(),
+          alasan: _alasanController.text.trim(),
+          tindakan: _tindakanController.text.trim(),
+          note: _noteController.text.trim(),
+        );
+      } else {
+        await GuruSpService.addReport(
+          studentId: _studentId,
+          spDate: spDate,
+          jenisSp: _jenisSpController.text.trim(),
+          alasan: _alasanController.text.trim(),
+          tindakan: _tindakanController.text.trim(),
+          note: _noteController.text.trim(),
+        );
+      }
+
       if (mounted) {
         setState(() => _isSaving = false);
         Navigator.pop(context); // Close loading
-        Navigator.pop(context); // Go back to report page
+        Navigator.pop(context, true); // Go back with success
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Laporan SP berhasil disimpan'),
+            content: Text(widget.isEditing
+                ? 'Laporan SP berhasil diperbarui'
+                : 'Laporan SP berhasil disimpan'),
             backgroundColor: AppTheme.primaryGreen,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -141,7 +171,18 @@ class _GuruSpFormPageState extends State<GuruSpFormPage>
           ),
         );
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menyimpan: $e'),
+            backgroundColor: Colors.red.shade400,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -212,13 +253,6 @@ class _GuruSpFormPageState extends State<GuruSpFormPage>
             decoration: BoxDecoration(
               color: AppTheme.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
               border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: Row(
@@ -354,13 +388,6 @@ class _GuruSpFormPageState extends State<GuruSpFormPage>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
             border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

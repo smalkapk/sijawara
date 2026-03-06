@@ -95,7 +95,7 @@ class _MonthlyCalendarState extends State<MonthlyCalendar>
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: BorderRadius.circular(28),
-            boxShadow: AppTheme.cardShadow,
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: Column(
             children: [

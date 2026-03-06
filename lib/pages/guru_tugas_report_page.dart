@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../widgets/skeleton_loader.dart';
 import '../services/guru_tugas_service.dart';
 
 import 'guru_tugas_form_page.dart';
@@ -68,10 +69,7 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
             _buildHeader(context),
             Expanded(
               child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                          color: AppTheme.primaryGreen),
-                    )
+                    ? const PublicSpeakingSkeleton()
                   : _reports.isEmpty
                       ? Center(
                           child: Column(
@@ -105,11 +103,7 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
                                 ..._reports.asMap().entries.map((entry) {
                                   final index = entry.key;
                                   final report = entry.value;
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.only(bottom: 16.0),
-                                    child: _buildReportCard(report, index),
-                                  );
+                                  return _buildReportCard(report, index);
                                 }),
                                 const SizedBox(height: 100),
                               ],
@@ -210,90 +204,58 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isSelected
               ? AppTheme.primaryGreen.withOpacity(0.05)
               : AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryGreen.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : AppTheme.softShadow,
           border: Border.all(
-            color: isSelected ? AppTheme.primaryGreen : AppTheme.grey100,
-            width: isSelected ? 2 : 1,
+            color: AppTheme.grey100,
+            width: 1,
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.softPurple.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.check_circle_outline_rounded,
-                          color: AppTheme.softPurple,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          widget.subjectName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
+                Text(
+                  report.judul.isNotEmpty ? report.judul : 'Tanpa Judul',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                    height: 1.3,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    formattedDate,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.grey400,
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  formattedDate,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.grey400,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-            _buildReportItem('Judul', report.judul),
-            _buildDivider(),
             _buildReportItem('Materi', report.materi),
             _buildDivider(),
             _buildReportItem('Mentor', report.mentor),
-            _buildDivider(),
-            _buildReportItem('Catatan Guru', report.note),
+            if (report.note.isNotEmpty) ...[
+              _buildDivider(),
+              _buildReportItem('Catatan Guru', report.note),
+            ],
           ],
         ),
       ),
     );
   }
+
 
   Widget _buildReportItem(String label, String value) {
     return Column(
@@ -317,6 +279,8 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
             color: AppTheme.textPrimary,
             height: 1.4,
           ),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -341,13 +305,9 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppTheme.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, -10),
-          ),
-        ],
+        border: Border(
+          top: BorderSide(color: AppTheme.grey100, width: 1),
+        ),
       ),
       child: SafeArea(
         child: Row(
@@ -396,14 +356,12 @@ class _GuruTugasReportPageState extends State<GuruTugasReportPage> {
                     gradient: hasSelection ? null : AppTheme.mainGradient,
                     color: hasSelection ? AppTheme.gold : null,
                     borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                    boxShadow: hasSelection
-                        ? [
-                            BoxShadow(
-                                color: AppTheme.gold.withOpacity(0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4))
-                          ]
-                        : AppTheme.greenGlow,
+                    border: hasSelection
+                        ? null
+                        : Border.all(
+                            color: AppTheme.grey100,
+                            width: 1,
+                          ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

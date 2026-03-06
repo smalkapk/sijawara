@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../services/guru_tugas_service.dart';
+import '../widgets/skeleton_loader.dart';
 import 'guru_tugas_report_page.dart';
 import 'guru_kelas_tahfidz_report_page.dart';
 
@@ -120,29 +121,53 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              color: AppTheme.primaryGreen,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Memuat daftar siswa...',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.grey400,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            border: Border.all(color: AppTheme.grey100, width: 1),
+          ),
+          child: Row(
+            children: [
+              SkeletonLoader(
+                height: 44,
+                width: 44,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SkeletonLoader(height: 16, width: double.infinity),
+                    const SizedBox(height: 8),
+                    SkeletonLoader(
+                      height: 12,
+                      width: 120,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SkeletonLoader(
+                height: 24,
+                width: 24,
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -301,13 +326,6 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
               decoration: BoxDecoration(
                 color: AppTheme.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
                 border: Border.all(color: AppTheme.grey100, width: 1),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -342,7 +360,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
             decoration: BoxDecoration(
               gradient: AppTheme.mainGradient,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: AppTheme.greenGlow,
+              border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: const Icon(Icons.filter_list_rounded, color: Colors.white),
           ),
@@ -358,19 +376,18 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
         _showActionBottomSheet(student);
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.softShadow,
           border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Row(
           children: [
             Container(
-              width: 50,
-              height: 50,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppTheme.softPurple.withOpacity(0.1),
                 shape: BoxShape.circle,
@@ -379,7 +396,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                 child: Text(
                   student.name.isNotEmpty ? student.name[0] : '?',
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.softPurple,
                   ),
@@ -388,29 +405,13 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    student.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  if (student.className.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      student.className,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.grey400,
-                      ),
-                    ),
-                  ],
-                ],
+              child: Text(
+                student.name,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                ),
               ),
             ),
             const Icon(Icons.chevron_right_rounded, color: AppTheme.grey400),

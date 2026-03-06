@@ -124,7 +124,7 @@ wss.on('connection', (ws) => {
           return;
         }
 
-        const { receiver_id, message, attachment_type, attachment_url, attachment_name, attachment_size } = data;
+        const { receiver_id, message, attachment_type, attachment_url, attachment_name, attachment_size, reply_to_message_id } = data;
         if (!receiver_id || (!message && !attachment_url) || (message && message.trim() === '' && !attachment_url)) {
           ws.send(JSON.stringify({ type: 'error', message: 'receiver_id dan message/attachment diperlukan' }));
           return;
@@ -135,12 +135,32 @@ wss.on('connection', (ws) => {
           const aUrl = attachment_url || null;
           const aName = attachment_name || null;
           const aSize = attachment_size || null;
+          const replyToMessageId = reply_to_message_id || null;
           const msgText = (message || '').trim();
+
+          let replyPreview = null;
+          let replySenderId = null;
+          if (replyToMessageId) {
+            const [replyRows] = await pool.execute(
+              'SELECT sender_id, message, attachment_type FROM chat_messages WHERE id = ? LIMIT 1',
+              [replyToMessageId]
+            );
+            if (replyRows.length > 0) {
+              replySenderId = replyRows[0].sender_id;
+              if (replyRows[0].attachment_type === 'image') {
+                replyPreview = '📷 Foto';
+              } else if (replyRows[0].attachment_type === 'document') {
+                replyPreview = '📄 Dokumen';
+              } else {
+                replyPreview = replyRows[0].message || '';
+              }
+            }
+          }
 
           // Simpan ke database
           const [result] = await pool.execute(
-            'INSERT INTO chat_messages (sender_id, receiver_id, message, attachment_type, attachment_url, attachment_name, attachment_size) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [authenticatedUserId, receiver_id, msgText, aType, aUrl, aName, aSize]
+            'INSERT INTO chat_messages (sender_id, receiver_id, message, attachment_type, attachment_url, attachment_name, attachment_size, reply_to_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [authenticatedUserId, receiver_id, msgText, aType, aUrl, aName, aSize, replyToMessageId]
           );
 
           const msgId = result.insertId;
@@ -157,6 +177,9 @@ wss.on('connection', (ws) => {
               attachment_url: aUrl,
               attachment_name: aName,
               attachment_size: aSize,
+              reply_to_message_id: replyToMessageId,
+              reply_preview: replyPreview,
+              reply_sender_id: replySenderId,
               is_read: false,
               created_at: now,
             },
@@ -226,6 +249,9 @@ wss.on('connection', (ws) => {
             attachment_url: data.attachment_url || null,
             attachment_name: data.attachment_name || null,
             attachment_size: data.attachment_size || null,
+            reply_to_message_id: data.reply_to_message_id || null,
+            reply_preview: data.reply_preview || null,
+            reply_sender_id: data.reply_sender_id || null,
             is_read: false,
             created_at: data.created_at || new Date().toISOString().replace('T', ' ').substring(0, 19),
           },
@@ -234,6 +260,26 @@ wss.on('connection', (ws) => {
         // Hanya broadcast ke penerima, TANPA insert ke DB
         sendToUser(data.receiver_id, notifyPayload);
         console.log(`[Notify] ${authenticatedUserId} → ${data.receiver_id}: attachment notification`);
+        break;
+      }
+
+      // ── DELETE MESSAGE (broadcast soft-delete) ──
+      case 'delete_message': {
+        if (!authenticatedUserId) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Belum autentikasi' }));
+          return;
+        }
+        const { message_id: delMsgId, receiver_id: delReceiverId } = data;
+        if (!delMsgId) break;
+
+        // Broadcast ke pengirim dan penerima
+        const deletedPayload = {
+          type: 'message_deleted',
+          data: { message_id: delMsgId },
+        };
+        sendToUser(authenticatedUserId, deletedPayload);
+        if (delReceiverId) sendToUser(delReceiverId, deletedPayload);
+        console.log(`[Delete] User ${authenticatedUserId} deleted msg ${delMsgId}`);
         break;
       }
 
@@ -247,6 +293,12 @@ wss.on('connection', (ws) => {
           type: 'typing',
           data: { user_id: authenticatedUserId, is_typing: !!is_typing },
         });
+        break;
+      }
+
+      // ── PING/PONG (heartbeat) ──
+      case 'ping': {
+        ws.send(JSON.stringify({ type: 'pong' }));
         break;
       }
 

@@ -180,12 +180,9 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
                 borderRadius: BorderRadius.circular(22),
                 border: isToday && !isSelected
                     ? Border.all(color: AppTheme.emerald, width: 2)
-                    : !isSelected
-                        ? Border.all(color: AppTheme.grey100, width: 1)
-                        : null,
-                boxShadow: isSelected
-                    ? AppTheme.greenGlow
-                    : AppTheme.softShadow,
+                    : isSelected
+                        ? null
+                        : Border.all(color: AppTheme.grey100, width: 1),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
