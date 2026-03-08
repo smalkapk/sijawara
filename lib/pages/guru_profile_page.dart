@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
+import '../services/guru_profile_service.dart';
 import 'login_page.dart';
 import 'guru_bantuan_page.dart';
 import 'guru_profil_anda_page.dart';
@@ -19,6 +20,7 @@ class GuruProfilePage extends StatefulWidget {
 class _GuruProfilePageState extends State<GuruProfilePage> {
   String _userName = '';
   String _userRole = '';
+  String? _avatarUrl;
   String _className = 'Kelas X'; // TBD: Fetch from actual data if available
 
   @override
@@ -33,6 +35,19 @@ class _GuruProfilePageState extends State<GuruProfilePage> {
       _userName = prefs.getString('user_name') ?? 'Guru';
       _userRole = prefs.getString('user_role') ?? '';
     });
+
+    // Fetch avatar from DB
+    try {
+      final profile = await GuruProfileService.getBasicProfile();
+      if (mounted) {
+        setState(() {
+          _userName = profile.name.isNotEmpty ? profile.name : _userName;
+          _avatarUrl = profile.avatarUrl;
+        });
+      }
+    } catch (_) {
+      // Fallback to SharedPreferences data
+    }
   }
 
   String get _roleLabel {
@@ -110,28 +125,79 @@ class _GuruProfilePageState extends State<GuruProfilePage> {
     );
   }
 
+  Widget _buildAvatarImage(double size) {
+    final url = _avatarUrl ?? '';
+    if (url.isEmpty) return _buildInitialsWidget(size);
+
+    final imageUrl = url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
+    return ClipOval(
+      child: Image.network(
+        imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: size,
+            height: size,
+            color: AppTheme.primaryGreen.withOpacity(0.1),
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppTheme.primaryGreen,
+                ),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => _buildInitialsWidget(size),
+      ),
+    );
+  }
+
+  Widget _buildInitialsWidget(double size) {
+    final initials = _userName.isNotEmpty
+        ? _userName.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : 'G';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppTheme.primaryGreen.withOpacity(0.15),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontSize: size * 0.35,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.primaryGreen,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCenteredProfileInfo() {
     return Column(
       children: [
         // Avatar
         Container(
-          width: 100,
-          height: 100,
+          width: 106,
+          height: 106,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
               color: AppTheme.primaryGreen.withOpacity(0.3),
               width: 3,
             ),
-            color: AppTheme.primaryGreen.withOpacity(0.1),
           ),
-          child: const Center(
-            child: Icon(
-              Icons.person_rounded,
-              size: 48,
-              color: AppTheme.primaryGreen,
-            ),
-          ),
+          child: _buildAvatarImage(100),
         ),
         const SizedBox(height: 16),
 
@@ -183,13 +249,15 @@ class _GuruProfilePageState extends State<GuruProfilePage> {
               title: 'Profil Anda',
               subtitle: 'Informasi data diri',
               color: AppTheme.primaryGreen,
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const GuruProfilAndaPage(),
                   ),
                 );
+                // Refresh avatar after returning from profile edit
+                _loadUserData();
               },
             ),
             _buildDivider(),

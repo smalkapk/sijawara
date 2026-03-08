@@ -4,6 +4,80 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/wali_service.dart';
 
+/// Build child avatar with network image or fallback to initials
+Widget buildChildAvatar(
+  String? avatarUrl,
+  String initials,
+  double size, {
+  Color? bgColor,
+  Color? textColor,
+  Color? borderColor,
+}) {
+  final url = avatarUrl ?? '';
+  final effectiveBg = bgColor ?? AppTheme.primaryGreen.withOpacity(0.12);
+  final effectiveText = textColor ?? AppTheme.primaryGreen;
+
+  Widget buildInitials() {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: effectiveBg,
+        border: borderColor != null ? Border.all(color: borderColor, width: 1) : null,
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontSize: size * 0.35,
+            fontWeight: FontWeight.w800,
+            color: effectiveText,
+          ),
+        ),
+      ),
+    );
+  }
+
+  if (url.isNotEmpty) {
+    final imageUrl = url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: borderColor != null ? Border.all(color: borderColor, width: 1) : null,
+      ),
+      child: ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: effectiveBg),
+              child: const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.white),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => buildInitials(),
+        ),
+      ),
+    );
+  }
+
+  return buildInitials();
+}
+
 class WaliStudentProfile extends StatelessWidget {
   final WaliChildInfo? child;
   final List<WaliChildInfo> allChildren;
@@ -30,11 +104,11 @@ class WaliStudentProfile extends StatelessWidget {
         onTap: _hasMultipleChildren
             ? () => _showChildSwitcherSheet(context)
             : null,
-        child: Container(
+          child: Container(
           decoration: BoxDecoration(
             color: AppTheme.primaryGreen,
             borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-            boxShadow: AppTheme.greenGlow,
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -42,27 +116,13 @@ class WaliStudentProfile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Avatar
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.white.withOpacity(0.15),
-                    border: Border.all(
-                      color: AppTheme.white.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      initials,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.white,
-                      ),
-                    ),
-                  ),
+                buildChildAvatar(
+                  child?.studentAvatar,
+                  initials,
+                  56,
+                  bgColor: AppTheme.white.withOpacity(0.15),
+                  textColor: AppTheme.white,
+                  borderColor: AppTheme.white.withOpacity(0.3),
                 ),
                 const SizedBox(width: 16),
 
@@ -261,27 +321,16 @@ class _ChildSwitcherSheet extends StatelessWidget {
                 child: Row(
                   children: [
                     // Avatar
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSelected
-                            ? AppTheme.primaryGreen
-                            : AppTheme.primaryGreen.withOpacity(0.12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          child.initials,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: isSelected
-                                ? AppTheme.white
-                                : AppTheme.primaryGreen,
-                          ),
-                        ),
-                      ),
+                    buildChildAvatar(
+                      child.studentAvatar,
+                      child.initials,
+                      48,
+                      bgColor: isSelected
+                          ? AppTheme.primaryGreen
+                          : AppTheme.primaryGreen.withOpacity(0.12),
+                      textColor: isSelected
+                          ? AppTheme.white
+                          : AppTheme.primaryGreen,
                     ),
                     const SizedBox(width: 14),
 

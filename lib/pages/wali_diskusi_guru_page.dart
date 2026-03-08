@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
+import '../widgets/skeleton_loader.dart';
 import '../services/chat_service.dart';
+import '../services/fcm_service.dart';
 import '../widgets/chat_attachments.dart';
+import 'chat_detail_page.dart';
 
 /// Halaman chat Wali → Guru Kelas
 /// Langsung masuk ke chat (tanpa daftar kontak), karena wali hanya
@@ -17,7 +20,8 @@ class WaliDiskusiGuruPage extends StatefulWidget {
   State<WaliDiskusiGuruPage> createState() => _WaliDiskusiGuruPageState();
 }
 
-class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
+class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage>
+    with WidgetsBindingObserver {
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocus = FocusNode();
@@ -31,6 +35,9 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
   ChatMessage? _replyingTo;
   int _currentUserId = 0;
 
+  // Pin state (read-only for wali)
+  Map<String, dynamic>? _pinnedMessage;
+
   // WebSocket
   ChatWebSocket? _ws;
   StreamSubscription<Map<String, dynamic>>? _wsSub;
@@ -38,7 +45,29 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App kembali ke foreground: set kembali activeChatPartnerId
+      if (_guruInfo != null) {
+        FcmService.instance.activeChatPartnerId = _guruInfo!.guruId;
+        // Mark pesan dibaca saat kembali ke foreground
+        ChatService.markReadHttp(partnerId: _guruInfo!.guruId);
+      }
+      // Reconnect WS jika terputus di background
+      if (_ws == null || !_ws!.isConnected) {
+        _connectWebSocket();
+      }
+    } else if (state == AppLifecycleState.paused) {
+      // App masuk background: clear activeChatPartnerId
+      // agar FCM notification tetap muncul saat app di background
+      FcmService.instance.activeChatPartnerId = null;
+    }
   }
 
   Future<void> _init() async {
@@ -48,6 +77,9 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
       final guruInfo = await ChatService.getGuruInfo();
       if (!mounted) return;
       setState(() => _guruInfo = guruInfo);
+
+      // Set active chat partner agar FCM tidak tampilkan notifikasi
+      FcmService.instance.activeChatPartnerId = guruInfo.guruId;
 
       final messages =
           await ChatService.getHistory(partnerId: guruInfo.guruId);
@@ -59,6 +91,7 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
 
       _scrollToBottom();
       ChatService.markReadHttp(partnerId: guruInfo.guruId);
+      _loadPinnedMessage(guruInfo.guruId);
       _connectWebSocket();
     } catch (e) {
       if (!mounted) return;
@@ -165,6 +198,27 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
               () => _isPartnerTyping = typingData['is_typing'] == true);
         }
         break;
+
+      case 'message_pinned':
+        final pinData = data['data'] as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _pinnedMessage = {
+              'message_id': pinData['message_id'],
+              'pinned_by': pinData['pinned_by'],
+              'pinned_by_name': pinData['pinned_by_name'] ?? '',
+              'pin_preview': pinData['pin_preview'] ?? '',
+              'sender_id': pinData['pin_sender_id'],
+            };
+          });
+        }
+        break;
+
+      case 'message_unpinned':
+        if (mounted) {
+          setState(() => _pinnedMessage = null);
+        }
+        break;
     }
   }
 
@@ -264,14 +318,18 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
     );
   }
 
-  void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+  void _scrollToBottom({bool animate = true}) {
+    Future.delayed(const Duration(milliseconds: 80), () {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        if (animate) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        } else {
+          _scrollController.jumpTo(0);
+        }
       }
     });
   }
@@ -292,6 +350,9 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Clear active chat partner
+    FcmService.instance.activeChatPartnerId = null;
     _msgController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();
@@ -303,11 +364,12 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        color: const Color(0xFFECE5DD),
+      backgroundColor: AppTheme.bgColor,
+      body: SafeArea(
         child: Column(
           children: [
             _buildAppBar(),
+            _buildPinnedBar(),
             Expanded(
               child: _isLoading
                   ? _buildLoadingState()
@@ -322,13 +384,110 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
     );
   }
 
-  Widget _buildAppBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 16, 12),
-      child: SafeArea(
-        bottom: false,
+  Future<void> _loadPinnedMessage(int partnerId) async {
+    try {
+      final pinned = await ChatService.getPinnedMessage(partnerId: partnerId);
+      if (mounted) {
+        setState(() => _pinnedMessage = pinned);
+      }
+    } catch (e) {
+      debugPrint('Gagal load pinned message: $e');
+    }
+  }
+
+  void _scrollToPinnedMessage() {
+    if (_pinnedMessage == null) return;
+    final pinnedId = _pinnedMessage!['message_id'];
+    final idx = _messages.indexWhere((m) => m.id == pinnedId);
+    if (idx == -1) return;
+
+    final reverseIdx = _messages.length - 1 - idx;
+    if (_scrollController.hasClients) {
+      final estimate = reverseIdx * 80.0;
+      _scrollController.animateTo(
+        estimate,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Widget _buildPinnedBar() {
+    if (_pinnedMessage == null) return const SizedBox.shrink();
+
+    final preview = _pinnedMessage!['pin_preview'] as String? ?? 'Pesan';
+    final senderId = _pinnedMessage!['sender_id'];
+    final senderName = senderId == _currentUserId
+        ? 'Anda'
+        : (_guruInfo?.guruName ?? 'Guru');
+
+    return GestureDetector(
+      onTap: _scrollToPinnedMessage,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          border: Border(
+            bottom: BorderSide(color: AppTheme.grey100, width: 1),
+          ),
+        ),
         child: Row(
           children: [
+            Container(
+              width: 3,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.push_pin_rounded,
+                size: 16, color: AppTheme.primaryGreen),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Pesan disematkan',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    '$senderName: $preview',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 16, 10),
+      decoration: BoxDecoration(
+        color: AppTheme.white,
+        border: Border(bottom: BorderSide(color: AppTheme.grey100, width: 1)),
+      ),
+      child: Row(
+        children: [
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
@@ -352,13 +511,23 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
             CircleAvatar(
               radius: 20,
               backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.12),
-              child: Text(
-                _guruInfo != null ? _getInitials(_guruInfo!.guruName) : '?',
-                style: const TextStyle(
-                    color: AppTheme.primaryGreen,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14),
-              ),
+              backgroundImage: _guruAvatarResolvedUrl.isNotEmpty
+                  ? NetworkImage(_guruAvatarResolvedUrl)
+                  : null,
+              onBackgroundImageError: _guruAvatarResolvedUrl.isNotEmpty
+                  ? (_, __) {}
+                  : null,
+              child: _guruAvatarResolvedUrl.isEmpty
+                  ? Text(
+                      _guruInfo != null
+                          ? _getInitials(_guruInfo!.guruName)
+                          : '?',
+                      style: const TextStyle(
+                          color: AppTheme.primaryGreen,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14),
+                    )
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -396,36 +565,62 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.more_vert_rounded,
-                  color: AppTheme.textSecondary),
-              onPressed: () {},
-            ),
-          ],
-        ),
+          IconButton(
+            icon: const Icon(Icons.more_vert_rounded,
+                color: AppTheme.textSecondary),
+            onPressed: () {},
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-                strokeWidth: 3, color: AppTheme.primaryGreen),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      itemCount: 8,
+      itemBuilder: (context, index) {
+        final isMe = index % 3 == 0;
+        return Align(
+          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.75),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            decoration: BoxDecoration(
+              color: isMe ? AppTheme.mint.withValues(alpha: 0.35) : AppTheme.white,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(14),
+                topRight: const Radius.circular(14),
+                bottomLeft: isMe ? const Radius.circular(14) : const Radius.circular(4),
+                bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(14),
+              ),
+              border: Border.all(color: AppTheme.grey100, width: isMe ? 0 : 1),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonLoader(
+                  height: 12,
+                  width: MediaQuery.of(context).size.width * (isMe ? 0.35 : 0.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SkeletonLoader(height: 10, width: 80, borderRadius: BorderRadius.circular(6)),
+                    const SizedBox(width: 8),
+                    SkeletonLoader(height: 10, width: 42, borderRadius: BorderRadius.circular(6)),
+                  ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          Text('Memuat percakapan...',
-              style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.grey400,
-                  fontWeight: FontWeight.w500)),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -496,23 +691,28 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
 
     return Stack(
       children: [
-        ListView.builder(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          itemCount: _messages.length,
-          itemBuilder: (context, index) {
-            final msg = _messages[index];
-            final showDate = index == 0 ||
-                !_isSameDate(_messages[index - 1].createdAt, msg.createdAt);
-            return Column(
-              children: [
-                if (showDate)
-                  _buildDateChip(_formatDateGroupLabel(msg.createdAt)),
-                _buildMessageBubble(msg),
-              ],
-            );
-          },
+        Container(
+          color: AppTheme.offWhite,
+          child: ListView.builder(
+            controller: _scrollController,
+            reverse: true,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            itemCount: _messages.length,
+            itemBuilder: (context, index) {
+              final msgIndex = _messages.length - 1 - index;
+              final msg = _messages[msgIndex];
+              final showDate = msgIndex == 0 ||
+                  !_isSameDate(_messages[msgIndex - 1].createdAt, msg.createdAt);
+              return Column(
+                children: [
+                  if (showDate)
+                    _buildDateChip(_formatDateGroupLabel(msg.createdAt)),
+                  _buildMessageBubble(msg),
+                ],
+              );
+            },
+          ),
         ),
         if (_isUploading)
           Positioned(
@@ -524,7 +724,7 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.black87,
+                  color: AppTheme.textPrimary.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Row(
@@ -590,18 +790,13 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
       margin: const EdgeInsets.symmetric(vertical: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFE1F2FB),
+        color: AppTheme.white,
+        border: Border.all(color: AppTheme.grey100, width: 1),
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 1)),
-        ],
       ),
       child: Text(date,
           style: const TextStyle(
-              color: Color(0xFF5A7A84),
+              color: AppTheme.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w600)),
     );
@@ -665,13 +860,19 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                 }
               }
             : null,
-        onPin: () {
-          Navigator.pop(context);
-          // TODO: implementasi pin pesan
-        },
         onDetail: () {
           Navigator.pop(context);
-          // TODO: implementasi detail pesan
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatDetailPage(
+                message: msg,
+                senderName: _guruInfo?.guruName ?? 'Guru Kelas',
+                partnerName: _guruInfo?.guruName ?? 'Guru Kelas',
+                currentUserId: _currentUserId,
+              ),
+            ),
+          );
         },
       ),
     );
@@ -682,33 +883,24 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 3),
+        margin: const EdgeInsets.only(bottom: 6),
         constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.78),
+            maxWidth: MediaQuery.of(context).size.width * 0.76),
         child: Container(
-          padding: EdgeInsets.fromLTRB(
-              isMe ? 10 : 16, 8, isMe ? 16 : 10, 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           decoration: BoxDecoration(
-            color: isMe ? const Color(0xFFDCF8C6) : Colors.white,
+            color: isMe ? AppTheme.mint.withValues(alpha: 0.45) : AppTheme.white,
             borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(8),
-              topRight: const Radius.circular(8),
-              bottomLeft: isMe
-                  ? const Radius.circular(8)
-                  : const Radius.circular(0),
-              bottomRight: isMe
-                  ? const Radius.circular(0)
-                  : const Radius.circular(8),
+              topLeft: const Radius.circular(14),
+              topRight: const Radius.circular(14),
+              bottomLeft: isMe ? const Radius.circular(14) : const Radius.circular(4),
+              bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(14),
             ),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 2,
-                  offset: const Offset(0, 1)),
-            ],
+            border: Border.all(color: AppTheme.grey100, width: isMe ? 0 : 1),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (msg.replyToMessageId != null && msg.message != 'deleted')
                 Container(
@@ -718,7 +910,7 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                   decoration: BoxDecoration(
                     color: isMe
                         ? AppTheme.primaryGreen.withValues(alpha: 0.10)
-                        : const Color(0xFFF1F1F1),
+                        : AppTheme.grey100.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(10),
                     border: Border(
                       left: BorderSide(
@@ -756,40 +948,40 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                     ],
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.only(right: 48),
-                child: msg.message == 'deleted'
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.block_rounded,
-                              size: 14,
-                              color: const Color(0xFF9BA5A5).withValues(alpha: 0.8)),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Pesan telah dihapus',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              color: const Color(0xFF9BA5A5).withValues(alpha: 0.9),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Text(msg.message,
-                        style: const TextStyle(
-                            color: Color(0xFF303030),
-                            fontSize: 15,
-                            height: 1.35)),
-              ),
+              if (msg.message == 'deleted')
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.block_rounded,
+                        size: 14,
+                        color: AppTheme.grey400.withValues(alpha: 0.7)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Pesan telah dihapus',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: AppTheme.grey400.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  msg.message,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    height: 1.35,
+                  ),
+                ),
+              const SizedBox(height: 6),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(_formatTime(msg.createdAt),
                       style: TextStyle(
-                          color: isMe
-                              ? const Color(0xFF6D9B78)
-                              : const Color(0xFF9BA5A5),
+                          color: AppTheme.grey400,
                           fontSize: 11,
                           fontWeight: FontWeight.w400)),
                   if (isMe) ...[
@@ -800,8 +992,8 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                           : Icons.done_rounded,
                       size: 16,
                       color: msg.isRead
-                          ? const Color(0xFF53BDEB)
-                          : const Color(0xFF8FAE96),
+                          ? AppTheme.softBlue
+                          : AppTheme.grey400,
                     ),
                   ],
                 ],
@@ -815,8 +1007,8 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
 
   Widget _buildMessageInput() {
     return Container(
-      color: const Color(0xFFF0F0F0),
-      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+      color: AppTheme.white,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       child: SafeArea(
         top: false,
         child: Column(
@@ -842,7 +1034,7 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppTheme.offWhite,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppTheme.grey100, width: 1),
                       ),
@@ -904,30 +1096,24 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                     ),
             ),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Container(
-                    constraints: const BoxConstraints(minHeight: 48),
+                    constraints: const BoxConstraints(minHeight: 50),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.offWhite,
                       borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1)),
-                      ],
+                      border: Border.all(color: AppTheme.grey100, width: 1),
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                    // Emoji button
                     Padding(
-                      padding: const EdgeInsets.only(left: 4, bottom: 4),
+                      padding: const EdgeInsets.only(left: 4),
                       child: IconButton(
                         icon: const Icon(Icons.emoji_emotions_outlined,
-                            color: Color(0xFF8696A0), size: 24),
+                            color: AppTheme.grey400, size: 22),
                         onPressed: () {
                           _inputFocus.unfocus();
                           ChatEmojiPicker.show(
@@ -948,13 +1134,16 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                         decoration: const InputDecoration(
                           hintText: 'Ketik pesan',
                           hintStyle: TextStyle(
-                              color: Color(0xFF8696A0), fontSize: 16),
+                              color: AppTheme.grey400, fontSize: 15),
                           border: InputBorder.none,
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(
                               vertical: 12, horizontal: 0),
                         ),
-                        style: const TextStyle(fontSize: 16),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppTheme.textPrimary,
+                        ),
                         textCapitalization: TextCapitalization.sentences,
                         maxLines: 5,
                         minLines: 1,
@@ -971,32 +1160,29 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                       ),
                     ),
                     // Attachment button
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: IconButton(
-                        icon: Transform.rotate(
-                          angle: 0.7,
-                          child: const Icon(Icons.attach_file_rounded,
-                              color: Color(0xFF8696A0), size: 24),
-                        ),
-                        onPressed: () {
-                          ChatAttachmentPicker.show(
-                            context,
-                            onFilePicked: _sendAttachment,
-                          );
-                        },
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                            minWidth: 40, minHeight: 40),
+                    IconButton(
+                      icon: Transform.rotate(
+                        angle: 0.7,
+                        child: const Icon(Icons.attach_file_rounded,
+                            color: AppTheme.grey400, size: 22),
                       ),
+                      onPressed: () {
+                        ChatAttachmentPicker.show(
+                          context,
+                          onFilePicked: _sendAttachment,
+                        );
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                          minWidth: 40, minHeight: 40),
                     ),
                     // Camera button (when no text)
                     if (_msgController.text.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(right: 4, bottom: 4),
+                        padding: const EdgeInsets.only(right: 4),
                         child: IconButton(
                           icon: const Icon(Icons.camera_alt_rounded,
-                              color: Color(0xFF8696A0), size: 24),
+                              color: AppTheme.grey400, size: 22),
                           onPressed: () {
                             ChatCameraPicker.show(
                               context,
@@ -1021,8 +1207,10 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
                   child: Container(
                     width: 48,
                     height: 48,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.primaryGreen,
+                    decoration: BoxDecoration(
+                      color: _msgController.text.isNotEmpty
+                          ? AppTheme.primaryGreen
+                          : AppTheme.grey400,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -1046,6 +1234,13 @@ class _WaliDiskusiGuruPageState extends State<WaliDiskusiGuruPage> {
     final parts = name.split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return parts[0][0].toUpperCase();
+  }
+
+  /// Resolve avatar URL guru: jika relative → tambahkan base URL.
+  String get _guruAvatarResolvedUrl {
+    final url = _guruInfo?.guruAvatar?.trim() ?? '';
+    if (url.isEmpty) return '';
+    return url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
   }
 }
 
@@ -1188,7 +1383,6 @@ class _MessageOptionsSheet extends StatelessWidget {
   final String partnerName;
   final VoidCallback onReply;
   final VoidCallback? onDelete;
-  final VoidCallback onPin;
   final VoidCallback onDetail;
 
   const _MessageOptionsSheet({
@@ -1196,7 +1390,6 @@ class _MessageOptionsSheet extends StatelessWidget {
     required this.partnerName,
     required this.onReply,
     this.onDelete,
-    required this.onPin,
     required this.onDetail,
   });
 
@@ -1301,14 +1494,6 @@ class _MessageOptionsSheet extends StatelessWidget {
               labelColor: Colors.red,
               onTap: onDelete!,
             ),
-
-          // Opsi: Pin
-          _OptionTile(
-            icon: Icons.push_pin_outlined,
-            iconColor: AppTheme.textSecondary,
-            label: 'Pin Pesan',
-            onTap: onPin,
-          ),
 
           // Opsi: Detail
           _OptionTile(

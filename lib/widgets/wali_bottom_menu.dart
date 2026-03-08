@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/connectivity_service.dart';
+import 'connectivity_wrapper.dart';
 
 /// Scroll handler for Wali bottom menu - reuses same logic as main app.
 class BottomMenuScrollHandler {
@@ -80,10 +82,40 @@ class WaliBottomMenu extends StatefulWidget {
 
 class _WaliBottomMenuState extends State<WaliBottomMenu> {
   @override
+  void initState() {
+    super.initState();
+    ConnectivityService.instance.isConnected.addListener(_onConnectivityChanged);
+  }
+
+  @override
+  void dispose() {
+    ConnectivityService.instance.isConnected.removeListener(_onConnectivityChanged);
+    super.dispose();
+  }
+
+  void _onConnectivityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final isOffline = !ConnectivityService.instance.isConnected.value;
+    final navBarHeight = 62.0 + bottomPadding;
 
-    return AnimatedSlide(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isOffline)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            curve: widget.isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
+            transform: widget.isVisible
+                ? Matrix4.identity()
+                : Matrix4.translationValues(0, navBarHeight - 40, 0),
+            child: const OfflineBanner(),
+          ),
+        AnimatedSlide(
       offset: widget.isVisible ? Offset.zero : const Offset(0, 1.5),
       duration: const Duration(milliseconds: 350),
       curve: widget.isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
@@ -95,14 +127,7 @@ class _WaliBottomMenuState extends State<WaliBottomMenu> {
           decoration: BoxDecoration(
             color: AppTheme.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                        boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                spreadRadius: 2,
-                offset: const Offset(0, -4),
-              ),
-            ],
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -141,6 +166,8 @@ class _WaliBottomMenuState extends State<WaliBottomMenu> {
           ),
         ),
       ),
+      ),
+      ],
     );
   }
 }
@@ -208,20 +235,12 @@ class _WaliMenuButtonState extends State<_WaliMenuButton>
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
+                  decoration: BoxDecoration(
                   gradient: widget.isSelected ? widget.gradient : null,
                   color: widget.isSelected ? null : AppTheme.bgColor,
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: widget.isSelected
-                      ? [
-                          BoxShadow(
-                            color: widget.gradient.colors.first.withOpacity(
-                              0.3,
-                            ),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
+                  border: widget.isSelected
+                      ? Border.all(color: AppTheme.grey100, width: 1)
                       : null,
                 ),
                 child: Icon(

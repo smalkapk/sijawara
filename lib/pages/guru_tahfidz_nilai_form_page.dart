@@ -429,6 +429,9 @@ class _GuruTahfidzNilaiFormPageState extends State<GuruTahfidzNilaiFormPage> {
   }
 
   Widget _buildStudentInfo() {
+    final avatarUrl = widget.studentData?['avatar_url']?.toString() ?? '';
+    final name = widget.studentData?['name'] ?? 'Siswa';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -438,15 +441,7 @@ class _GuruTahfidzNilaiFormPageState extends State<GuruTahfidzNilaiFormPage> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.white,
-              shape: BoxShape.circle,
-              boxShadow: AppTheme.softShadow,
-            ),
-            child: const Icon(Icons.person_outline_rounded, color: AppTheme.primaryGreen),
-          ),
+          _buildStudentAvatar(avatarUrl, name, 48),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -472,6 +467,47 @@ class _GuruTahfidzNilaiFormPageState extends State<GuruTahfidzNilaiFormPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStudentAvatar(String avatarUrl, String name, double size) {
+    if (avatarUrl.isNotEmpty) {
+      final imageUrl = avatarUrl.startsWith('http') ? avatarUrl : 'https://portal-smalka.com/$avatarUrl';
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: size, height: size,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.primaryGreen.withOpacity(0.1)),
+              child: const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen))),
+            );
+          },
+          errorBuilder: (_, __, ___) => _buildStudentInitials(name, size),
+        ),
+      );
+    }
+    return _buildStudentInitials(name, size);
+  }
+
+  Widget _buildStudentInitials(String name, double size) {
+    final initials = name.isNotEmpty
+        ? name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : '?';
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppTheme.white,
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Center(
+        child: Text(initials, style: TextStyle(fontSize: size * 0.35, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
       ),
     );
   }

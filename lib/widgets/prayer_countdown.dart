@@ -49,6 +49,7 @@ void showPrayerTrackingSheet(
   ValueChanged<PrayerSaveResult>? onPrayerSaved,
   String? initialWakeUpTime,
   List<String> initialDeeds = const [],
+  bool initialEditing = false,
 }) {
   HapticFeedback.mediumImpact();
 
@@ -76,7 +77,7 @@ void showPrayerTrackingSheet(
       prayers: defaultPrayers,
       statuses: effectiveStatuses,
       date: date,
-      initialEditing: false,
+      initialEditing: initialEditing,
       initialWakeUpTime: initialWakeUpTime,
       initialDeeds: initialDeeds,
       onSave: onSave ?? (_) {},
@@ -185,7 +186,7 @@ class _FutureDateBlockedSheet extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: AppTheme.mainGradient,
                       borderRadius: BorderRadius.circular(14),
-                      boxShadow: AppTheme.greenGlow,
+                      border: Border.all(color: AppTheme.grey100, width: 1),
                     ),
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -402,6 +403,17 @@ class _PrayerCountdownState extends State<PrayerCountdown>
     _timer.cancel();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  // ───── Barcode Scanner Bottom Sheet ─────
+  void _showBarcodeScannerSheet(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _BarcodeScannerSheet(),
+    );
   }
 
   // ───── Bottom Sheet ─────
@@ -716,38 +728,81 @@ class _PrayerCountdownState extends State<PrayerCountdown>
 
           const SizedBox(height: 10),
 
-          // REKAP button
-          GestureDetector(
-            onTap: _showPrayerTrackingSheet,
-            child: Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                gradient: AppTheme.mainGradient,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.edit_note_rounded,
-                    size: 14,
-                    color: AppTheme.white,
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    'REKAP',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.white,
-                      letterSpacing: 1.5,
+          // REKAP + Barcode buttons
+          Row(
+            children: [
+              // REKAP button
+              Expanded(
+                child: GestureDetector(
+                  onTap: _showPrayerTrackingSheet,
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 2, right: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.mainGradient,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.edit_note_rounded,
+                          size: 14,
+                          color: AppTheme.white,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'REKAP',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.white,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+
+              // Barcode scan button
+              GestureDetector(
+                onTap: () => _showBarcodeScannerSheet(context),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.primaryGreen.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.qr_code_scanner_rounded,
+                        size: 14,
+                        color: AppTheme.primaryGreen,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'SCAN',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.primaryGreen,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -903,6 +958,7 @@ class _PrayerTrackingSheetState extends State<_PrayerTrackingSheet>
   }
 
   /// Load wake-up time & deeds dari server untuk tanggal ini
+  /// Juga load status shalat jika belum ada dari parent
   Future<void> _loadExtrasFromServer() async {
     try {
       final date = widget.date != null
@@ -911,6 +967,22 @@ class _PrayerTrackingSheetState extends State<_PrayerTrackingSheet>
       final data = await PrayerService.getPrayersByDate(date);
       if (!mounted) return;
       setState(() {
+        // Load prayer statuses dari server agar tidak overwrite saat save
+        for (final entry in data.prayers.entries) {
+          switch (entry.value.status) {
+            case 'done':
+              _statuses[entry.key] = PrayerStatus.done;
+              break;
+            case 'done_jamaah':
+              _statuses[entry.key] = PrayerStatus.doneJamaah;
+              break;
+            default:
+              _statuses[entry.key] = PrayerStatus.upcoming;
+          }
+        }
+        // Update original statuses agar delta poin dihitung dengan benar
+        _originalStatuses = Map.from(_statuses);
+
         if (data.wakeUpTime != null && data.wakeUpTime!.isNotEmpty) {
           _selectedWakeUpTime = data.wakeUpTime;
         }
@@ -1259,11 +1331,11 @@ class _PrayerTrackingSheetState extends State<_PrayerTrackingSheet>
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
                       ),
-                      child: Ink(
+                        child: Ink(
                         decoration: BoxDecoration(
                           gradient: AppTheme.mainGradient,
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: AppTheme.greenGlow,
+                          border: Border.all(color: AppTheme.grey100, width: 1),
                         ),
                         child: Container(
                           alignment: Alignment.center,
@@ -1405,18 +1477,7 @@ class _PrayerTrackingSheetState extends State<_PrayerTrackingSheet>
             gradient: isSelected ? AppTheme.mainGradient : null,
             color: isSelected ? null : AppTheme.white,
             borderRadius: BorderRadius.circular(12),
-            border: isSelected
-                ? null
-                : Border.all(color: AppTheme.grey200, width: 1),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppTheme.primaryGreen.withOpacity(0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : null,
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: Center(
             child: Text(
@@ -1454,18 +1515,7 @@ class _PrayerTrackingSheetState extends State<_PrayerTrackingSheet>
             gradient: isCustomSelected ? AppTheme.mainGradient : null,
             color: isCustomSelected ? null : AppTheme.white,
             borderRadius: BorderRadius.circular(12),
-            border: isCustomSelected
-                ? null
-                : Border.all(color: AppTheme.grey200, width: 1),
-            boxShadow: isCustomSelected
-                ? [
-                    BoxShadow(
-                      color: AppTheme.primaryGreen.withOpacity(0.25),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : null,
+            border: Border.all(color: AppTheme.grey100, width: 1),
           ),
           child: Center(
             child: Text(
@@ -1543,22 +1593,11 @@ class _PrayerTrackingSheetState extends State<_PrayerTrackingSheet>
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
+          decoration: BoxDecoration(
           gradient: isSelected ? AppTheme.mainGradient : null,
           color: isSelected ? null : AppTheme.white,
           borderRadius: BorderRadius.circular(20),
-          border: isSelected
-              ? null
-              : Border.all(color: AppTheme.grey200, width: 1),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppTheme.primaryGreen.withOpacity(0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2050,7 +2089,7 @@ class _CustomTimePickerSheetState extends State<_CustomTimePickerSheet> {
                   decoration: BoxDecoration(
                     gradient: AppTheme.mainGradient,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: AppTheme.greenGlow,
+                    border: Border.all(color: AppTheme.grey100, width: 1),
                   ),
                   child: Container(
                     alignment: Alignment.center,
@@ -2278,7 +2317,7 @@ class _CustomDeedInputSheetState extends State<_CustomDeedInputSheet> {
                           _isValid ? AppTheme.mainGradient : null,
                       color: _isValid ? null : AppTheme.grey100,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: _isValid ? AppTheme.greenGlow : null,
+                      border: _isValid ? Border.all(color: AppTheme.grey100, width: 1) : null,
                     ),
                     child: Container(
                       alignment: Alignment.center,
@@ -2316,4 +2355,302 @@ class _CustomDeedInputSheetState extends State<_CustomDeedInputSheet> {
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// ───── Bottom Sheet: Barcode Scanner ─────
+// ═══════════════════════════════════════════════════════
+
+class _BarcodeScannerSheet extends StatefulWidget {
+  const _BarcodeScannerSheet();
+
+  @override
+  State<_BarcodeScannerSheet> createState() => _BarcodeScannerSheetState();
+}
+
+class _BarcodeScannerSheetState extends State<_BarcodeScannerSheet>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _scanLineAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    _scanLineAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.of(context).viewPadding.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * 0.75;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: const BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.grey200,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.mainGradient,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.qr_code_scanner_rounded,
+                    color: AppTheme.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Scan Barcode Ibadah',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Arahkan kamera ke barcode',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.grey400,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Close button
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.grey100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppTheme.grey400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Camera preview placeholder
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Stack(
+                  children: [
+                    // Camera placeholder background
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.camera_alt_rounded,
+                            size: 48,
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Kamera akan aktif di sini',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(0.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Scan frame corners
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: CustomPaint(
+                          painter: _ScanFramePainter(),
+                        ),
+                      ),
+                    ),
+
+                    // Animated scan line
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 44,
+                          vertical: 44,
+                        ),
+                        child: AnimatedBuilder(
+                          animation: _scanLineAnimation,
+                          builder: (context, child) {
+                            return Align(
+                              alignment: Alignment(
+                                0,
+                                -1 + 2 * _scanLineAnimation.value,
+                              ),
+                              child: Container(
+                                height: 2,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.transparent,
+                                      AppTheme.primaryGreen.withOpacity(0.8),
+                                      AppTheme.emerald,
+                                      AppTheme.primaryGreen.withOpacity(0.8),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(1),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          AppTheme.primaryGreen.withOpacity(0.4),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Instructions
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppTheme.primaryGreen.withOpacity(0.15),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: AppTheme.primaryGreen,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Scan barcode yang diberikan oleh guru untuk konfirmasi ibadah',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          SizedBox(height: 20 + bottomPad),
+        ],
+      ),
+    );
+  }
+}
+
+// ───── Scan Frame Corner Painter ─────
+class _ScanFramePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppTheme.primaryGreen
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const cornerLen = 24.0;
+
+    // Top-left
+    canvas.drawLine(const Offset(0, 0), const Offset(cornerLen, 0), paint);
+    canvas.drawLine(const Offset(0, 0), const Offset(0, cornerLen), paint);
+
+    // Top-right
+    canvas.drawLine(Offset(size.width, 0), Offset(size.width - cornerLen, 0), paint);
+    canvas.drawLine(Offset(size.width, 0), Offset(size.width, cornerLen), paint);
+
+    // Bottom-left
+    canvas.drawLine(Offset(0, size.height), Offset(cornerLen, size.height), paint);
+    canvas.drawLine(Offset(0, size.height), Offset(0, size.height - cornerLen), paint);
+
+    // Bottom-right
+    canvas.drawLine(Offset(size.width, size.height), Offset(size.width - cornerLen, size.height), paint);
+    canvas.drawLine(Offset(size.width, size.height), Offset(size.width, size.height - cornerLen), paint);
+  }
+
+  @override
+  bool shouldRepaint(_ScanFramePainter oldDelegate) => false;
 }

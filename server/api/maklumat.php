@@ -19,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../config/conn.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/fcm_helper.php';
 
 // ── Autentikasi ──
 $token = getBearerToken();
@@ -199,6 +200,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $icon       = trim($input['icon'] ?? 'campaign');
     $imageUrl   = isset($input['image_url']) ? trim($input['image_url']) : null;
     $pdfUrl     = isset($input['pdf_url']) ? trim($input['pdf_url']) : null;
+    $notifTitle = trim($input['notif_title'] ?? '');
+    $notifBody  = trim($input['notif_body'] ?? '');
 
     // Validasi
     if (empty($judul) || empty($deskripsi)) {
@@ -250,10 +253,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $newId = $pdo->lastInsertId();
 
+        // ── Kirim push notification via FCM ke siswa & orang tua ──
+        $fcmDebug = ['enabled' => true];
+        try {
+            // Ambil user_id siswa di kelas ini
+            $stmtStudents = $pdo->prepare(
+                'SELECT user_id FROM students WHERE class_id = :class_id'
+            );
+            $stmtStudents->execute(['class_id' => $classId]);
+            $studentUserIds = $stmtStudents->fetchAll(PDO::FETCH_COLUMN);
+
+            $fcmDebug['class_id'] = $classId;
+            $fcmDebug['target'] = $target;
+            $fcmDebug['student_user_ids'] = $studentUserIds;
+            error_log("[FCM] Maklumat #{$newId}: class_id={$classId}, target={$target}, student_user_ids=" . json_encode($studentUserIds));
+
+            $targetUserIds = [];
+
+            if ($target === 'siswa' || $target === 'keduanya') {
+                $targetUserIds = array_merge($targetUserIds, $studentUserIds);
+            }
+
+            if ($target === 'orang_tua' || $target === 'keduanya') {
+                if (!empty($studentUserIds)) {
+                    $stmtSids = $pdo->prepare(
+                        "SELECT id FROM students WHERE class_id = :class_id"
+                    );
+                    $stmtSids->execute(['class_id' => $classId]);
+                    $studentIds = $stmtSids->fetchAll(PDO::FETCH_COLUMN);
+
+                    if (!empty($studentIds)) {
+                        $sidPlaceholders = implode(',', array_fill(0, count($studentIds), '?'));
+                        $stmtParents = $pdo->prepare(
+                            "SELECT DISTINCT ps.parent_id
+                             FROM parent_student ps
+                             WHERE ps.student_id IN ({$sidPlaceholders})"
+                        );
+                        $stmtParents->execute(array_values($studentIds));
+                        $parentUserIds = $stmtParents->fetchAll(PDO::FETCH_COLUMN);
+                        $targetUserIds = array_merge($targetUserIds, $parentUserIds);
+                        $fcmDebug['parent_user_ids'] = $parentUserIds;
+                        error_log("[FCM] Maklumat #{$newId}: parent_user_ids=" . json_encode($parentUserIds));
+                    }
+                }
+            }
+
+            $targetUserIds = array_unique(array_map('intval', $targetUserIds));
+            $fcmDebug['final_target_user_ids'] = array_values($targetUserIds);
+            error_log("[FCM] Maklumat #{$newId}: final target_user_ids=" . json_encode(array_values($targetUserIds)));
+
+            if (!empty($targetUserIds)) {
+                $placeholders = implode(',', array_fill(0, count($targetUserIds), '?'));
+                $stmtCheckTokens = $pdo->prepare(
+                    "SELECT user_id, LEFT(token, 20) as token_prefix FROM fcm_tokens WHERE user_id IN ({$placeholders})"
+                );
+                $stmtCheckTokens->execute(array_values($targetUserIds));
+                $availableTokens = $stmtCheckTokens->fetchAll();
+                $fcmDebug['available_tokens'] = $availableTokens;
+                error_log("[FCM] Maklumat #{$newId}: available FCM tokens=" . json_encode($availableTokens));
+
+                // Gunakan custom notif title/body jika tersedia, fallback ke judul/deskripsi
+                $fcmTitle = !empty($notifTitle) ? $notifTitle : $judul;
+                $fcmBody  = !empty($notifBody) ? $notifBody : (mb_strlen($deskripsi) > 120 ? mb_substr($deskripsi, 0, 120) . '...' : $deskripsi);
+                $fcmDebug['notif_title'] = $fcmTitle;
+                $fcmDebug['notif_body'] = $fcmBody;
+
+                $fcmResult = sendFcmToUsers(
+                    $pdo,
+                    $targetUserIds,
+                    $fcmTitle,
+                    $fcmBody,
+                    [
+                        'type' => 'maklumat',
+                        'maklumat_id' => (string) $newId,
+                        'prioritas' => $prioritas,
+                    ]
+                );
+
+                $fcmDebug['result'] = $fcmResult;
+                error_log("[FCM] Maklumat #{$newId}: sent={$fcmResult['sent']}, failed={$fcmResult['failed']}, errors=" . json_encode($fcmResult['errors']));
+            } else {
+                $fcmDebug['result'] = 'no_target_users';
+            }
+        } catch (Exception $fcmError) {
+            $fcmDebug['error'] = $fcmError->getMessage();
+            error_log("[FCM] Error sending maklumat notification: " . $fcmError->getMessage());
+        }
+
         echo json_encode([
             'success' => true,
             'message' => 'Maklumat berhasil dibuat',
             'data'    => ['id' => $newId],
+            'fcm_debug' => $fcmDebug,
         ]);
     } catch (PDOException $e) {
         http_response_code(500);

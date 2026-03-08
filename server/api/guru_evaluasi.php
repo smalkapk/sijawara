@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../config/conn.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/fcm_helper.php';
 
 // ── Autentikasi ──
 $token = getBearerToken();
@@ -438,6 +439,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
+
+        // ── Kirim push notification via FCM ke siswa & orang tua ──
+        // Hanya untuk evaluasi baru (bukan update)
+        if (!$noteId) {
+            try {
+                // Ambil user_id dan nama siswa
+                $stmtStudent = $pdo->prepare(
+                    'SELECT s.user_id, u.name AS student_name
+                     FROM students s
+                     JOIN users u ON s.user_id = u.id
+                     WHERE s.id = :sid LIMIT 1'
+                );
+                $stmtStudent->execute(['sid' => $studentId]);
+                $studentRow = $stmtStudent->fetch();
+
+                if ($studentRow) {
+                    $studentUserId = (int) $studentRow['user_id'];
+                    $studentName   = $studentRow['student_name'] ?? 'Siswa';
+
+                    // ── FCM ke siswa ──
+                    $fcmResultSiswa = sendFcmToUsers(
+                        $pdo,
+                        [$studentUserId],
+                        'Evaluasi Guru Telah Terbit',
+                        'Periksa hasil evaluasi guru melalui aplikasi sekarang',
+                        [
+                            'type'          => 'evaluasi',
+                            'evaluasi_id'   => (string) $resultId,
+                            'student_id'    => (string) $studentId,
+                        ]
+                    );
+                    error_log("[FCM] Evaluasi #{$resultId}: siswa user_id={$studentUserId}, sent={$fcmResultSiswa['sent']}, failed={$fcmResultSiswa['failed']}");
+
+                    // ── FCM ke orang tua ──
+                    $stmtParents = $pdo->prepare(
+                        'SELECT DISTINCT ps.parent_id
+                         FROM parent_student ps
+                         WHERE ps.student_id = :sid'
+                    );
+                    $stmtParents->execute(['sid' => $studentId]);
+                    $parentUserIds = $stmtParents->fetchAll(PDO::FETCH_COLUMN);
+
+                    if (!empty($parentUserIds)) {
+                        $parentUserIds = array_map('intval', $parentUserIds);
+                        $fcmResultWali = sendFcmToUsers(
+                            $pdo,
+                            $parentUserIds,
+                            'Evaluasi Ananda Telah Terbit',
+                            'Hasil Evaluasi Guru telah terbit, silahkan untuk mengeceknya di aplikasi',
+                            [
+                                'type'          => 'evaluasi',
+                                'evaluasi_id'   => (string) $resultId,
+                                'student_id'    => (string) $studentId,
+                                'student_name'  => $studentName,
+                            ]
+                        );
+                        error_log("[FCM] Evaluasi #{$resultId}: parent_ids=" . json_encode($parentUserIds) . ", sent={$fcmResultWali['sent']}, failed={$fcmResultWali['failed']}");
+                    }
+                }
+            } catch (Exception $fcmErr) {
+                // Jangan gagalkan response jika FCM error
+                error_log("[FCM] Error sending evaluasi notification: " . $fcmErr->getMessage());
+            }
+        }
 
         echo json_encode([
             'success' => true,

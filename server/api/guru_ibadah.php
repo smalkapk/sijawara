@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         try {
             if ($guru['role'] === 'guru_kelas') {
                 $stmt = $pdo->prepare(
-                    "SELECT s.id AS student_id, s.nis, u.name, c.name AS class_name
+                    "SELECT s.id AS student_id, s.nis, u.name, c.name AS class_name, u.avatar_url
                      FROM students s
                      JOIN users u ON s.user_id = u.id
                      LEFT JOIN classes c ON s.class_id = c.id
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 );
             } else {
                 $stmt = $pdo->prepare(
-                    "SELECT s.id AS student_id, s.nis, u.name, c.name AS class_name
+                    "SELECT s.id AS student_id, s.nis, u.name, c.name AS class_name, u.avatar_url
                      FROM students s
                      JOIN users u ON s.user_id = u.id
                      LEFT JOIN classes c ON s.class_id = c.id
@@ -84,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'nis'         => $row['nis'] ?? '',
                     'name'        => $row['name'],
                     'class_name'  => $row['class_name'] ?? '',
+                    'avatar_url'  => $row['avatar_url'] ?? '',
                 ];
             }
 

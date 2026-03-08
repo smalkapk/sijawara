@@ -77,7 +77,55 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
       'nis': student.nis,
       'name': student.name,
       'class_name': student.className,
+      'avatar_url': student.avatarUrl ?? '',
     };
+  }
+
+  /// Build student avatar with DB image or fallback to initials
+  Widget _buildStudentAvatar(String? avatarUrl, String name, double size, {Color? bgColor, Color? textColor}) {
+    final url = avatarUrl ?? '';
+    final effectiveBgColor = bgColor ?? AppTheme.softPurple.withOpacity(0.1);
+    final effectiveTextColor = textColor ?? AppTheme.softPurple;
+
+    if (url.isNotEmpty) {
+      final imageUrl = url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: effectiveBgColor),
+              child: const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen))),
+            );
+          },
+          errorBuilder: (_, __, ___) => _buildInitials(name, size, effectiveBgColor, effectiveTextColor),
+        ),
+      );
+    }
+    return _buildInitials(name, size, effectiveBgColor, effectiveTextColor);
+  }
+
+  Widget _buildInitials(String name, double size, Color bgColor, Color textColor) {
+    final initials = name.isNotEmpty
+        ? name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : '?';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: bgColor),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(fontSize: size * 0.4, fontWeight: FontWeight.w800, color: textColor),
+        ),
+      ),
+    );
   }
 
   @override
@@ -385,24 +433,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.softPurple.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  student.name.isNotEmpty ? student.name[0] : '?',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.softPurple,
-                  ),
-                ),
-              ),
-            ),
+            _buildStudentAvatar(student.avatarUrl, student.name, 44),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -448,24 +479,7 @@ class _GuruSiswaPageState extends State<GuruSiswaPage> {
                 ),
               ),
               // Profile Section
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppTheme.softPurple.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    student.name.isNotEmpty ? student.name[0] : '?',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.softPurple,
-                    ),
-                  ),
-                ),
-              ),
+              _buildStudentAvatar(student.avatarUrl, student.name, 72),
               const SizedBox(height: 16),
               Text(
                 student.name,

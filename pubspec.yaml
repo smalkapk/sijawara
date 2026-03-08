@@ -27,6 +27,11 @@ dependencies:
   emoji_picker_flutter: ^4.4.0
   file_picker: ^10.3.10
   mime: ^2.0.0
+  connectivity_plus: ^6.1.4
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  firebase_core: ^3.13.0
+  firebase_messaging: ^15.2.5
 
 dev_dependencies:
   flutter_test:
@@ -39,3 +44,4 @@ flutter:
   assets:
     - lib/assets/
     - lib/assets/sounds/
+    - server/assets/logosmalka.png

@@ -473,13 +473,13 @@ class _WaliHomePageState extends State<WaliHomePage>
               ],
             ),
           ),
-          // Notification bell - Minimalist design
+          // Notification bell - Minimalist design (remove shadow -> use border)
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppTheme.white,
               shape: BoxShape.circle,
-              boxShadow: AppTheme.softShadow,
+              border: Border.all(color: AppTheme.grey100, width: 1),
             ),
             child: const Icon(
               Icons.notifications_none_rounded,

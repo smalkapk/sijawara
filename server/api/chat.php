@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../config/conn.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/fcm_helper.php';
 
 try {
 
@@ -345,6 +346,23 @@ switch ($action) {
         ]);
         $msgId = (int) $pdo->lastInsertId();
 
+        // ── FCM push notification (fallback HTTP) ──
+        $senderName = $currentUser['name'] ?? 'Pengirim';
+        $notifBody = mb_strlen($message) > 100 ? mb_substr($message, 0, 100) . '…' : $message;
+        $senderRole = $currentUser['role'] ?? '';
+        $senderAvatar = $currentUser['avatar_url'] ?? '';
+        if ($senderAvatar && strpos($senderAvatar, 'http') !== 0) {
+            $senderAvatar = 'https://portal-smalka.com/' . $senderAvatar;
+        }
+        sendFcmToUsers($pdo, [$receiverId], $senderName, $notifBody, [
+            'type'          => 'chat',
+            'sender_id'     => (string) $userId,
+            'sender_name'   => $senderName,
+            'sender_role'   => $senderRole,
+            'sender_avatar' => $senderAvatar,
+            'channel_id'    => 'chat_channel',
+        ]);
+
         echo json_encode([
             'success' => true,
             'data' => [
@@ -489,6 +507,29 @@ switch ($action) {
         ]);
         $msgId = (int) $pdo->lastInsertId();
 
+        // ── FCM push notification (fallback HTTP) ──
+        $senderName = $currentUser['name'] ?? 'Pengirim';
+        if ($attachType === 'image') {
+            $notifBody = '📷 Mengirim foto';
+        } elseif ($attachType === 'document') {
+            $notifBody = '📄 Mengirim dokumen';
+        } else {
+            $notifBody = $message ?: 'Mengirim file';
+        }
+        $senderRole = $currentUser['role'] ?? '';
+        $senderAvatarUpload = $currentUser['avatar_url'] ?? '';
+        if ($senderAvatarUpload && strpos($senderAvatarUpload, 'http') !== 0) {
+            $senderAvatarUpload = 'https://portal-smalka.com/' . $senderAvatarUpload;
+        }
+        sendFcmToUsers($pdo, [$receiverId], $senderName, $notifBody, [
+            'type'          => 'chat',
+            'sender_id'     => (string) $userId,
+            'sender_name'   => $senderName,
+            'sender_role'   => $senderRole,
+            'sender_avatar' => $senderAvatarUpload,
+            'channel_id'    => 'chat_channel',
+        ]);
+
         echo json_encode([
             'success' => true,
             'data' => [
@@ -557,6 +598,170 @@ switch ($action) {
             'data' => [
                 'message_id' => $messageId,
                 'receiver_id' => (int) $msgRow['receiver_id'],
+            ]
+        ]);
+        break;
+
+    // ═══════════════════════════════════════
+    // PIN: Pin pesan (hanya guru_kelas)
+    // ═══════════════════════════════════════
+    case 'pin':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Gunakan POST']);
+            exit;
+        }
+
+        if ($currentUser['role'] !== 'guru_kelas') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Hanya guru kelas yang dapat pin pesan']);
+            exit;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $messageId = (int) ($input['message_id'] ?? 0);
+        $partnerId = (int) ($input['partner_id'] ?? 0);
+
+        if ($messageId <= 0 || $partnerId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'message_id dan partner_id diperlukan']);
+            exit;
+        }
+
+        // Pastikan pesan ada dan bukan deleted
+        $stmtMsg = $pdo->prepare(
+            "SELECT id, sender_id, receiver_id, message, attachment_type, attachment_name
+             FROM chat_messages WHERE id = :mid AND message != 'deleted' LIMIT 1"
+        );
+        $stmtMsg->execute(['mid' => $messageId]);
+        $pinMsg = $stmtMsg->fetch();
+
+        if (!$pinMsg) {
+            echo json_encode(['success' => false, 'message' => 'Pesan tidak ditemukan']);
+            exit;
+        }
+
+        // Pastikan pesan dalam percakapan yang benar
+        $msgUsers = [(int)$pinMsg['sender_id'], (int)$pinMsg['receiver_id']];
+        if (!in_array($userId, $msgUsers) || !in_array($partnerId, $msgUsers)) {
+            echo json_encode(['success' => false, 'message' => 'Pesan bukan bagian dari percakapan ini']);
+            exit;
+        }
+
+        $userA = min($userId, $partnerId);
+        $userB = max($userId, $partnerId);
+
+        // Upsert pin (satu pin per percakapan)
+        $stmtPin = $pdo->prepare(
+            'INSERT INTO chat_pinned_messages (message_id, user_a, user_b, pinned_by, pinned_at)
+             VALUES (:mid, :ua, :ub, :pby, NOW())
+             ON DUPLICATE KEY UPDATE message_id = VALUES(message_id), pinned_by = VALUES(pinned_by), pinned_at = NOW()'
+        );
+        $stmtPin->execute([
+            'mid' => $messageId,
+            'ua' => $userA,
+            'ub' => $userB,
+            'pby' => $userId,
+        ]);
+
+        // Buat preview text
+        $pinPreview = $pinMsg['message'] ?? '';
+        if ($pinMsg['attachment_type'] === 'image') $pinPreview = '📷 Foto';
+        else if ($pinMsg['attachment_type'] === 'document') $pinPreview = '📄 ' . ($pinMsg['attachment_name'] ?? 'Dokumen');
+
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'message_id' => $messageId,
+                'partner_id' => $partnerId,
+                'pinned_by' => $userId,
+                'pin_preview' => $pinPreview,
+                'pin_sender_id' => (int) $pinMsg['sender_id'],
+            ]
+        ]);
+        break;
+
+    // ═══════════════════════════════════════
+    // UNPIN: Hapus pin (hanya guru_kelas)
+    // ═══════════════════════════════════════
+    case 'unpin':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Gunakan POST']);
+            exit;
+        }
+
+        if ($currentUser['role'] !== 'guru_kelas') {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Hanya guru kelas yang dapat unpin pesan']);
+            exit;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $partnerId = (int) ($input['partner_id'] ?? 0);
+
+        if ($partnerId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'partner_id diperlukan']);
+            exit;
+        }
+
+        $userA = min($userId, $partnerId);
+        $userB = max($userId, $partnerId);
+
+        $stmtUnpin = $pdo->prepare(
+            'DELETE FROM chat_pinned_messages WHERE user_a = :ua AND user_b = :ub'
+        );
+        $stmtUnpin->execute(['ua' => $userA, 'ub' => $userB]);
+
+        echo json_encode([
+            'success' => true,
+            'data' => ['partner_id' => $partnerId]
+        ]);
+        break;
+
+    // ═══════════════════════════════════════
+    // GET PINNED: Ambil pesan yang di-pin
+    // ═══════════════════════════════════════
+    case 'get_pinned':
+        $partnerId = (int) ($_GET['partner_id'] ?? 0);
+
+        if ($partnerId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'partner_id diperlukan']);
+            exit;
+        }
+
+        $userA = min($userId, $partnerId);
+        $userB = max($userId, $partnerId);
+
+        $stmtPinned = $pdo->prepare(
+            "SELECT p.message_id, p.pinned_by, p.pinned_at,
+                    m.sender_id, m.message, m.attachment_type, m.attachment_name,
+                    u.name AS pinned_by_name
+             FROM chat_pinned_messages p
+             JOIN chat_messages m ON p.message_id = m.id
+             JOIN users u ON p.pinned_by = u.id
+             WHERE p.user_a = :ua AND p.user_b = :ub
+             AND m.message != 'deleted'
+             LIMIT 1"
+        );
+        $stmtPinned->execute(['ua' => $userA, 'ub' => $userB]);
+        $pinnedRow = $stmtPinned->fetch();
+
+        if (!$pinnedRow) {
+            echo json_encode(['success' => true, 'data' => null]);
+            exit;
+        }
+
+        $pinPreview = $pinnedRow['message'] ?? '';
+        if ($pinnedRow['attachment_type'] === 'image') $pinPreview = '📷 Foto';
+        else if ($pinnedRow['attachment_type'] === 'document') $pinPreview = '📄 ' . ($pinnedRow['attachment_name'] ?? 'Dokumen');
+
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'message_id' => (int) $pinnedRow['message_id'],
+                'sender_id' => (int) $pinnedRow['sender_id'],
+                'pinned_by' => (int) $pinnedRow['pinned_by'],
+                'pinned_by_name' => $pinnedRow['pinned_by_name'],
+                'pin_preview' => $pinPreview,
+                'pinned_at' => $pinnedRow['pinned_at'],
             ]
         ]);
         break;

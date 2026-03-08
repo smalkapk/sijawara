@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/app_logo.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -29,27 +30,13 @@ class AboutPage extends StatelessWidget {
                   children: [
                     const SizedBox(height: 20),
                     // Logo
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.white,
-                        boxShadow: AppTheme.softShadow,
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/logo_sekolah.png', // Fallback ke logo sekolah yang ada
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.school_rounded,
-                              size: 48,
-                              color: AppTheme.primaryGreen,
-                            );
-                          },
-                        ),
-                      ),
+                    const AppLogo(
+                      width: 168,
+                      height: 96,
+                      backgroundColor: AppTheme.white,
+                      borderRadius: BorderRadius.all(Radius.circular(28)),
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      showShadow: true,
                     ),
                     const SizedBox(height: 24),
                     const Text(

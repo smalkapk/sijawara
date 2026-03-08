@@ -849,12 +849,13 @@ class _GuruIbadahDaySheetState extends State<_GuruIbadahDaySheet> {
         .length;
 
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       decoration: const BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -870,11 +871,24 @@ class _GuruIbadahDaySheetState extends State<_GuruIbadahDaySheet> {
           ),
           const SizedBox(height: 16),
 
-          // Header: Date + Edit button
+          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
               children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.mainGradient,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.mosque_rounded,
+                    color: AppTheme.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -888,12 +902,12 @@ class _GuruIbadahDaySheetState extends State<_GuruIbadahDaySheet> {
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         dateStr,
                         style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.grey600,
+                          fontSize: 12,
+                          color: AppTheme.grey400,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -905,7 +919,6 @@ class _GuruIbadahDaySheetState extends State<_GuruIbadahDaySheet> {
                   onTap: () {
                     HapticFeedback.lightImpact();
                     if (_isEditing) {
-                      // Cancel — restore original statuses
                       setState(() {
                         _statuses = Map.from(_originalStatuses);
                         _isEditing = false;
@@ -990,7 +1003,6 @@ class _GuruIbadahDaySheetState extends State<_GuruIbadahDaySheet> {
                     ),
                   ),
                   const Spacer(),
-                  // Mini dots
                   Row(
                     children: List.generate(5, (i) {
                       return Container(
@@ -1046,82 +1058,74 @@ class _GuruIbadahDaySheetState extends State<_GuruIbadahDaySheet> {
             const SizedBox(height: 12),
           ],
 
-          // Prayer list
+          // Scrollable content
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.all(32),
               child: CircularProgressIndicator(color: AppTheme.primaryGreen),
             )
           else
-            ...List.generate(_defaultPrayers.length, (i) {
-              final prayer = _defaultPrayers[i];
-              final status =
-                  _statuses[prayer.name] ?? _PrayerStatus.upcoming;
-              return _buildPrayerRow(prayer, status);
-            }),
-
-          // Extras section (read-only)
-          if (!_isLoading && (_wakeUpTime != null || _deeds.isNotEmpty)) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.bgColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_wakeUpTime != null) ...[
-                      Row(
+                    // ── Bangun Pagi Section ──
+                    _buildWakeUpSection(),
+
+                    const SizedBox(height: 12),
+
+                    // ── Shalat Section Header ──
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
                         children: [
-                          const Icon(Icons.alarm_rounded,
-                              size: 16, color: AppTheme.gold),
-                          const SizedBox(width: 8),
+                          Icon(Icons.mosque_rounded,
+                              size: 16, color: AppTheme.primaryGreen),
+                          const SizedBox(width: 6),
                           Text(
-                            'Bangun: $_wakeUpTime',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
+                            'REKAP SHALAT',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.primaryGreen,
+                              letterSpacing: 0.8,
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                    if (_deeds.isNotEmpty) ...[
-                      if (_wakeUpTime != null)
-                        const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.star_rounded,
-                              size: 16, color: AppTheme.gold),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              'Kebaikan: ${_deeds.join(', ')}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
-                              ),
+                            child: Container(
+                              height: 1,
+                              color: AppTheme.primaryGreen.withOpacity(0.15),
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Prayer list
+                    ...List.generate(_defaultPrayers.length, (i) {
+                      final prayer = _defaultPrayers[i];
+                      final status =
+                          _statuses[prayer.name] ?? _PrayerStatus.upcoming;
+                      return _buildPrayerRow(prayer, status);
+                    }),
+
+                    const SizedBox(height: 16),
+
+                    // ── Kebaikan Section ──
+                    _buildDeedsSection(),
+
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
-          ],
 
           // Save button (only in edit mode)
-          if (_isEditing) ...[
-            const SizedBox(height: 16),
+          if (_isEditing && !_isLoading) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: SizedBox(
@@ -1162,8 +1166,186 @@ class _GuruIbadahDaySheetState extends State<_GuruIbadahDaySheet> {
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          SizedBox(
+            height: 16 + MediaQuery.of(context).viewPadding.bottom,
+          ),
         ],
+      ),
+    );
+  }
+
+  // ── Bangun Pagi Section (read-only, like student UI) ──
+  Widget _buildWakeUpSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.offWhite,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.grey100, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.alarm_rounded, size: 16, color: AppTheme.gold),
+                const SizedBox(width: 8),
+                const Text(
+                  'Bangun Pagi',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_wakeUpTime != null && _wakeUpTime!.isNotEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.mainGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.access_time_rounded,
+                        size: 16, color: AppTheme.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      _wakeUpTime!,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.white,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.grey100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.remove_circle_outline_rounded,
+                        size: 16, color: AppTheme.grey400),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Belum diisi',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.grey400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Kebaikan Section (read-only, like student UI) ──
+  Widget _buildDeedsSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.offWhite,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.grey100, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.star_rounded, size: 16, color: AppTheme.gold),
+                const SizedBox(width: 8),
+                const Text(
+                  'Hal Kebaikan',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_deeds.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _deeds.map((deed) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.mainGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_rounded,
+                            size: 14, color: AppTheme.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          deed,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              )
+            else
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.grey100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.remove_circle_outline_rounded,
+                        size: 16, color: AppTheme.grey400),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Belum ada kebaikan tercatat',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.grey400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

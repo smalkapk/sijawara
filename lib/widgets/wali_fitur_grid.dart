@@ -7,7 +7,6 @@ import '../pages/wali_diskusi_guru_page.dart';
 import '../pages/wali_tahfidz_page.dart';
 import '../pages/wali_bantuan_page.dart';
 import '../pages/wali_alka_ai_page.dart';
-import '../pages/wali_sp_siswa_page.dart';
 import '../pages/wali_evaluasi_page.dart';
 
 class WaliFiturGrid extends StatelessWidget {
@@ -22,71 +21,11 @@ class WaliFiturGrid extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        boxShadow: AppTheme.cardShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Search & Atur Fitur
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 40,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.bgColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.search_rounded,
-                        size: 18,
-                        color: AppTheme.grey400,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Cari fitur...',
-                            hintStyle: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: AppTheme.grey400),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 11,
-                            ),
-                          ),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.mainGradient,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppTheme.greenGlow,
-                ),
-                child: Center(
-                  child: Text(
-                    'Atur Fitur',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: AppTheme.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
           // Grid 4x2
           LayoutBuilder(
             builder: (context, constraints) {
@@ -192,20 +131,6 @@ class WaliFiturGrid extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => const WaliAlkaAiPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  buildGridItem(
-                    'SP Siswa',
-                    Icons.warning_amber_rounded,
-                    AppTheme.gold,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const WaliSpSiswaPage(),
                         ),
                       );
                     },

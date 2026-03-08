@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "818657477612",
+    "project_id": "sijawara-fd6cb",
+    "storage_bucket": "sijawara-fd6cb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:818657477612:android:166f8bdfb27fde7c09f6c9",
+        "android_client_info": {
+          "package_name": "com.smalka.sijawara"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCW8JTrtygJfbJDgJrOBh4uRgjss1tQYkY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

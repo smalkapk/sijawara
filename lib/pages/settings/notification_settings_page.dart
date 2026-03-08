@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme.dart';
+import '../../services/notification_service.dart';
 
 class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
@@ -28,13 +29,22 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   bool _diskusiBalasan = false;
   bool _poinBaru = true;
   bool _badgeBaru = true;
+  // Evaluasi
+  bool _evaluasiGuruKelas = true;
 
   bool _isSaving = false;
+  bool _isTesting = false;
+  bool _isScheduling = false;
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    _initNotifications();
+  }
+
+  Future<void> _initNotifications() async {
+    await NotificationService.instance.init();
   }
 
   Future<void> _loadPrefs() async {
@@ -51,6 +61,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       _diskusiBalasan = prefs.getBool('notif_diskusi') ?? false;
       _poinBaru = prefs.getBool('notif_poin') ?? true;
       _badgeBaru = prefs.getBool('notif_badge') ?? true;
+        _evaluasiGuruKelas = prefs.getBool('notif_evaluasi_guru') ?? true;
     });
   }
 
@@ -68,6 +79,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     await prefs.setBool('notif_diskusi', _diskusiBalasan);
     await prefs.setBool('notif_poin', _poinBaru);
     await prefs.setBool('notif_badge', _badgeBaru);
+    await prefs.setBool('notif_evaluasi_guru', _evaluasiGuruKelas);
     if (!mounted) return;
     setState(() => _isSaving = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -114,6 +126,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                       iconGradient: AppTheme.mainGradient,
                       title: 'Pengingat Shalat',
                       subtitle: 'Notifikasi waktu shalat 5 waktu',
+                      showIcon: false,
                     ),
                     const SizedBox(height: 10),
                     _buildCard([
@@ -176,19 +189,10 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                       iconGradient: AppTheme.sunsetGradient,
                       title: 'Notifikasi Aplikasi',
                       subtitle: 'Aktivitas & info dari aplikasi',
+                      showIcon: false,
                     ),
                     const SizedBox(height: 10),
                     _buildCard([
-                      _buildToggleItem(
-                        label: 'Reminder Harian Ibadah',
-                        icon: Icons.wb_sunny_rounded,
-                        iconColor: AppTheme.primaryGreen,
-                        value: _reminderHarian,
-                        onChanged: _masterEnabled
-                            ? (v) => setState(() => _reminderHarian = v)
-                            : null,
-                      ),
-                      _buildDivider(),
                       _buildToggleItem(
                         label: 'Pengumuman Sekolah',
                         icon: Icons.campaign_outlined,
@@ -198,39 +202,23 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             ? (v) =>
                                 setState(() => _pengumumanSekolah = v)
                             : null,
+                        showIcon: false,
                       ),
                       _buildDivider(),
                       _buildToggleItem(
-                        label: 'Balasan Diskusi',
-                        icon: Icons.forum_outlined,
-                        iconColor: AppTheme.teal,
-                        value: _diskusiBalasan,
+                        label: 'Evaluasi Guru Kelas',
+                        icon: Icons.rate_review_outlined,
+                        iconColor: AppTheme.softBlue,
+                        value: _evaluasiGuruKelas,
                         onChanged: _masterEnabled
-                            ? (v) => setState(() => _diskusiBalasan = v)
+                            ? (v) => setState(() => _evaluasiGuruKelas = v)
                             : null,
-                      ),
-                      _buildDivider(),
-                      _buildToggleItem(
-                        label: 'Poin Baru Diperoleh',
-                        icon: Icons.stars_rounded,
-                        iconColor: AppTheme.gold,
-                        value: _poinBaru,
-                        onChanged: _masterEnabled
-                            ? (v) => setState(() => _poinBaru = v)
-                            : null,
-                      ),
-                      _buildDivider(),
-                      _buildToggleItem(
-                        label: 'Badge Baru Didapat',
-                        icon: Icons.military_tech_rounded,
-                        iconColor: const Color(0xFFCD7F32),
-                        value: _badgeBaru,
-                        onChanged: _masterEnabled
-                            ? (v) => setState(() => _badgeBaru = v)
-                            : null,
+                        showIcon: false,
                       ),
                     ]),
                     const SizedBox(height: 28),
+                    _buildTestNotificationSection(),
+                    const SizedBox(height: 16),
                     _buildSaveButton(),
                     const SizedBox(height: 40),
                   ],
@@ -372,9 +360,11 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     required LinearGradient iconGradient,
     required String title,
     required String subtitle,
+    bool showIcon = true,
   }) {
-    return Row(
-      children: [
+    final children = <Widget>[];
+    if (showIcon) {
+      children.addAll([
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -384,28 +374,33 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
           child: Icon(icon, size: 16, color: AppTheme.white),
         ),
         const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
+      ]);
+    }
+
+    children.add(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
             ),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.grey400,
-              ),
+          ),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.grey400,
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
+
+    return Row(children: children);
   }
 
   Widget _buildCard(List<Widget> children) {
@@ -425,50 +420,57 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     required Color iconColor,
     required bool value,
     required void Function(bool)? onChanged,
+    bool showIcon = true,
   }) {
     final disabled = onChanged == null;
+    final rowChildren = <Widget>[];
+
+    if (showIcon) {
+      rowChildren.addAll([
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: disabled
+                ? AppTheme.grey100
+                : iconColor.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon,
+              size: 16, color: disabled ? AppTheme.grey200 : iconColor),
+        ),
+        const SizedBox(width: 12),
+      ]);
+    }
+
+    rowChildren.addAll([
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: disabled ? AppTheme.grey200 : AppTheme.textPrimary,
+          ),
+        ),
+      ),
+      Switch(
+        value: value && !disabled,
+        onChanged: onChanged != null
+            ? (v) {
+                HapticFeedback.lightImpact();
+                onChanged(v);
+              }
+            : null,
+        activeColor: AppTheme.white,
+        activeTrackColor: AppTheme.primaryGreen,
+        inactiveThumbColor: AppTheme.grey200,
+        inactiveTrackColor: AppTheme.grey100,
+      ),
+    ]);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: disabled
-                  ? AppTheme.grey100
-                  : iconColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon,
-                size: 16,
-                color: disabled ? AppTheme.grey200 : iconColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: disabled ? AppTheme.grey200 : AppTheme.textPrimary,
-              ),
-            ),
-          ),
-          Switch(
-            value: value && !disabled,
-            onChanged: onChanged != null
-                ? (v) {
-                    HapticFeedback.lightImpact();
-                    onChanged(v);
-                  }
-                : null,
-            activeColor: AppTheme.white,
-            activeTrackColor: AppTheme.primaryGreen,
-            inactiveThumbColor: AppTheme.grey200,
-            inactiveTrackColor: AppTheme.grey100,
-          ),
-        ],
-      ),
+      child: Row(children: rowChildren),
     );
   }
 
@@ -476,6 +478,260 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Divider(height: 1, color: AppTheme.grey100),
+    );
+  }
+
+  Widget _buildTestNotificationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(
+          icon: Icons.bug_report_rounded,
+          iconGradient: const LinearGradient(
+            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+          ),
+          title: 'Uji Notifikasi',
+          subtitle: 'Kirim notifikasi percobaan',
+          showIcon: false,
+        ),
+        const SizedBox(height: 10),
+        _buildCard([
+          // Button 1: Test instant notification for all enabled prayers
+          _buildTestButton(
+            icon: Icons.notifications_active_rounded,
+            iconColor: AppTheme.warmOrange,
+            label: 'Kirim Notifikasi Shalat Sekarang',
+            subtitle: 'Notifikasi instan untuk semua shalat yang aktif',
+            isLoading: _isTesting,
+            onPressed: _masterEnabled
+                ? () async {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _isTesting = true);
+
+                    // Minta izin dulu
+                    final granted =
+                        await NotificationService.instance.requestPermission();
+                    if (!granted) {
+                      if (!mounted) return;
+                      setState(() => _isTesting = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.warning_rounded,
+                                  color: AppTheme.white, size: 18),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Izin notifikasi ditolak. Aktifkan di Pengaturan HP.',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: AppTheme.warmOrange,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          margin: const EdgeInsets.all(16),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final count = await NotificationService.instance
+                        .triggerTestPrayerNotifications();
+
+                    if (!mounted) return;
+                    setState(() => _isTesting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.check_circle_rounded,
+                                color: AppTheme.white, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              count > 0
+                                  ? '$count notifikasi shalat terkirim!'
+                                  : 'Tidak ada shalat yang diaktifkan',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: count > 0
+                            ? AppTheme.primaryGreen
+                            : AppTheme.grey400,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        margin: const EdgeInsets.all(16),
+                      ),
+                    );
+                  }
+                : null,
+          ),
+          _buildDivider(),
+          // Button 2: Schedule today's prayer notifications
+          _buildTestButton(
+            icon: Icons.schedule_rounded,
+            iconColor: AppTheme.softBlue,
+            label: 'Jadwalkan Notifikasi Hari Ini',
+            subtitle: 'Atur jadwal shalat yang belum lewat hari ini',
+            isLoading: _isScheduling,
+            onPressed: _masterEnabled
+                ? () async {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _isScheduling = true);
+
+                    final granted =
+                        await NotificationService.instance.requestPermission();
+                    if (!granted) {
+                      if (!mounted) return;
+                      setState(() => _isScheduling = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.warning_rounded,
+                                  color: AppTheme.white, size: 18),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Izin notifikasi ditolak. Aktifkan di Pengaturan HP.',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: AppTheme.warmOrange,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          margin: const EdgeInsets.all(16),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Simpan dulu biar setting terbaru ke-apply
+                    await _savePrefs();
+
+                    final count = await NotificationService.instance
+                        .scheduleTodayPrayerNotifications();
+
+                    if (!mounted) return;
+                    setState(() => _isScheduling = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.alarm_on_rounded,
+                                color: AppTheme.white, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                count > 0
+                                    ? '$count pengingat shalat dijadwalkan hari ini'
+                                    : 'Semua waktu shalat sudah lewat hari ini',
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: count > 0
+                            ? AppTheme.softBlue
+                            : AppTheme.grey400,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        margin: const EdgeInsets.all(16),
+                      ),
+                    );
+                  }
+                : null,
+          ),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildTestButton({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String subtitle,
+    required bool isLoading,
+    required VoidCallback? onPressed,
+  }) {
+    final disabled = onPressed == null;
+    return InkWell(
+      onTap: isLoading ? null : onPressed,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: disabled
+                    ? AppTheme.grey100
+                    : iconColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: isLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: disabled ? AppTheme.grey200 : iconColor,
+                      ),
+                    )
+                  : Icon(icon,
+                      size: 16,
+                      color: disabled ? AppTheme.grey200 : iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          disabled ? AppTheme.grey200 : AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: disabled ? AppTheme.grey200 : AppTheme.grey400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: disabled ? AppTheme.grey200 : AppTheme.grey400,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

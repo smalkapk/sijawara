@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../services/public_speaking_service.dart';
+import '../widgets/skeleton_loader.dart';
 
 class WaliPublicSpeakingPage extends StatefulWidget {
   final int? studentId;
@@ -18,6 +20,7 @@ class _WaliPublicSpeakingPageState extends State<WaliPublicSpeakingPage>
 
   List<PublicSpeakingNote> _notes = [];
   bool _isLoading = true;
+  int? _selectedNoteIndex;
 
   @override
   void initState() {
@@ -156,30 +159,7 @@ class _WaliPublicSpeakingPageState extends State<WaliPublicSpeakingPage>
 
   // ── Loading State ──
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              color: AppTheme.primaryGreen,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Memuat laporan...',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.grey400,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const PublicSpeakingSkeleton();
   }
 
   // ── Empty State ──
@@ -248,266 +228,250 @@ class _WaliPublicSpeakingPageState extends State<WaliPublicSpeakingPage>
   // ── Note Card ──
   Widget _buildNoteCard(PublicSpeakingNote note, int index) {
     final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
-    final formattedDate = dateFormat.format(note.date);
+    final formattedDateLong = dateFormat.format(note.date);
+    final formattedDateShort = DateFormat('dd-MM-yyyy').format(note.date);
+    final isSelected = _selectedNoteIndex == index;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 400 + (index * 80)),
+      duration: Duration(milliseconds: 300 + (index * 60)),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         return Opacity(
           opacity: value,
           child: Transform.translate(
-            offset: Offset(0, 20 * (1 - value)),
+            offset: Offset(0, 12 * (1 - value)),
             child: child,
           ),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: AppTheme.white,
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.softShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Date header strip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: AppTheme.mainGradient,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          setState(() {
+            if (_selectedNoteIndex == index) {
+              _selectedNoteIndex = null;
+            } else {
+              _selectedNoteIndex = index;
+            }
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppTheme.primaryGreen.withOpacity(0.05)
+                : AppTheme.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            border: Border.all(color: AppTheme.grey100, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title + date
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    color: Colors.white70,
-                    size: 14,
+                  Text(
+                    note.judul.isNotEmpty ? note.judul : 'Tanpa Judul',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      formattedDate,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
+                  const SizedBox(height: 6),
+                  Text(
+                    formattedDateShort,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.grey400,
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 20),
 
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+              // Materi
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Judul
-                  if (note.judul.isNotEmpty) ...[
-                    Text(
-                      note.judul,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimary,
-                        letterSpacing: -0.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryGreen.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(height: 12),
-                    Container(height: 1, color: AppTheme.grey100),
-                    const SizedBox(height: 12),
-                  ],
-                  // Materi
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.subject_rounded,
-                          size: 16,
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Materi',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              note.materi.isNotEmpty
-                                  ? note.materi
-                                  : '(Belum diisi)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: note.materi.isNotEmpty
-                                    ? AppTheme.textPrimary
-                                    : AppTheme.grey400,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    child: Icon(
+                      Icons.subject_rounded,
+                      size: 16,
+                      color: AppTheme.primaryGreen,
+                    ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Divider
-                  Container(height: 1, color: AppTheme.grey100),
-
-                  const SizedBox(height: 12),
-
-                  // Mentor
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.softPurple.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.person_rounded,
-                          size: 16,
-                          color: AppTheme.softPurple,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Mentor',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              note.mentor.isNotEmpty
-                                  ? note.mentor
-                                  : '(Belum diisi oleh mentor)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: note.mentor.isNotEmpty
-                                    ? AppTheme.textPrimary
-                                    : AppTheme.grey400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (note.mentor.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.gold.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Menunggu',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.gold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  // Note section
-                  if (note.note.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Container(height: 1, color: AppTheme.grey100),
-                    const SizedBox(height: 12),
-                    Row(
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.teal.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.note_rounded,
-                            size: 16,
-                            color: AppTheme.teal,
+                        Text(
+                          'Materi',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.grey400,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Catatan',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.grey400,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                note.note,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimary,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(height: 2),
+                        Text(
+                          note.materi.isNotEmpty ? note.materi : '(Belum diisi)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: note.materi.isNotEmpty
+                                ? AppTheme.textPrimary
+                                : AppTheme.grey400,
+                            height: 1.4,
                           ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ],
               ),
-            ),
-          ],
+
+              const SizedBox(height: 12),
+              _buildDivider(),
+              const SizedBox(height: 12),
+
+              // Mentor row
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.softPurple.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.person_rounded,
+                      size: 16,
+                      color: AppTheme.softPurple,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mentor',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.grey400,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          note.mentor.isNotEmpty ? note.mentor : '(Belum diisi oleh mentor)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: note.mentor.isNotEmpty ? AppTheme.textPrimary : AppTheme.grey400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (note.mentor.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.gold.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Menunggu',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.gold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+
+              if (note.note.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildDivider(),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.teal.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.note_rounded,
+                        size: 16,
+                        color: AppTheme.teal,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Catatan',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.grey400,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            note.note,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textPrimary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 0),
+      child: Container(
+        height: 1,
+        color: AppTheme.grey100,
       ),
     );
   }

@@ -201,6 +201,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdo->commit();
 
+        // ── Kirim notifikasi FCM ke orang tua jika siswa yang submit (baru) ──
+        if (!$noteId) {
+            try {
+                $userId = getUserIdFromToken($token);
+                $stmtRole = $pdo->prepare('SELECT role FROM users WHERE id = :uid LIMIT 1');
+                $stmtRole->execute(['uid' => $userId]);
+                $roleRow = $stmtRole->fetch();
+
+                if ($roleRow && $roleRow['role'] === 'siswa') {
+                    require_once __DIR__ . '/../config/fcm_helper.php';
+
+                    // Ambil nama siswa
+                    $stmtName = $pdo->prepare(
+                        'SELECT u.name FROM students s JOIN users u ON s.user_id = u.id WHERE s.id = :sid'
+                    );
+                    $stmtName->execute(['sid' => $studentId]);
+                    $studentName = $stmtName->fetchColumn() ?: 'Ananda';
+
+                    // Ambil parent user_id(s)
+                    $stmtParent = $pdo->prepare('SELECT parent_id FROM parent_student WHERE student_id = :sid');
+                    $stmtParent->execute(['sid' => $studentId]);
+                    $parentIds = $stmtParent->fetchAll(PDO::FETCH_COLUMN);
+
+                    if (!empty($parentIds)) {
+                        $taskLabel = $judul ?: 'Public Speaking';
+                        $notifTitle = 'Ananda Baru Saja Mengerjakan Tugas';
+                        $notifBody  = "Ananda {$studentName} baru saja mengerjakan tugas Public Speaking ({$taskLabel}), klik untuk melihat!";
+
+                        sendFcmToUsers($pdo, $parentIds, $notifTitle, $notifBody, [
+                            'type'       => 'task_submitted',
+                            'task_type'  => 'public_speaking',
+                            'task_name'  => $taskLabel,
+                            'student_id' => (string) $studentId,
+                            'channel_id' => 'task_channel',
+                        ]);
+                    }
+                }
+            } catch (Exception $fcmEx) {
+                error_log('[FCM Task] Public Speaking FCM error: ' . $fcmEx->getMessage());
+            }
+        }
+
         echo json_encode([
             'success' => true,
             'message' => $noteId ? 'Catatan diperbarui' : 'Catatan disimpan',

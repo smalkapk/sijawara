@@ -99,6 +99,12 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
     return DateFormat('dd/MM/yy').format(dt);
   }
 
+  String _resolveAvatarUrl(String? avatarUrl) {
+    final url = avatarUrl?.trim() ?? '';
+    if (url.isEmpty) return '';
+    return url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -412,6 +418,7 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
             builder: (_) => GuruChatPage(
               waliId: contact.waliId,
               waliName: contact.waliName,
+              waliAvatarUrl: contact.avatarUrl,
               childrenNames: contact.childrenNames,
             ),
           ),
@@ -430,28 +437,7 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: _getAvatarColor(index).withValues(alpha: 0.12),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: _getAvatarColor(index),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    contact.initials,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            _buildWaliAvatar(contact, index),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -575,5 +561,54 @@ class _GuruDiskusiWaliPageState extends State<GuruDiskusiWaliPage> {
       const Color(0xFFE11D48),
     ];
     return colors[index % colors.length];
+  }
+
+  Widget _buildWaliAvatar(WaliContact contact, int index) {
+    final accentColor = _getAvatarColor(index);
+    final imageUrl = _resolveAvatarUrl(contact.avatarUrl);
+
+    if (imageUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: 48,
+          height: 48,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return _buildWaliInitialsAvatar(contact.initials, accentColor);
+          },
+          errorBuilder: (_, __, ___) =>
+              _buildWaliInitialsAvatar(contact.initials, accentColor),
+        ),
+      );
+    }
+
+    return _buildWaliInitialsAvatar(contact.initials, accentColor);
+  }
+
+  Widget _buildWaliInitialsAvatar(String initials, Color accentColor) {
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: accentColor.withValues(alpha: 0.12),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: accentColor,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

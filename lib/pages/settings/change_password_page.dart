@@ -123,55 +123,63 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       _buildInfoBanner(),
                       const SizedBox(height: 24),
 
-                      _buildSectionLabel('Password Saat Ini'),
-                      const SizedBox(height: 10),
-                      _buildPasswordField(
-                        controller: _currentPasswordController,
-                        label: 'Password lama',
-                        show: _showCurrent,
-                        onToggle: () =>
-                            setState(() => _showCurrent = !_showCurrent),
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? 'Password tidak boleh kosong'
-                            : null,
-                      ),
-
-                      const SizedBox(height: 20),
-                      _buildSectionLabel('Password Baru'),
-                      const SizedBox(height: 10),
-                      _buildPasswordField(
-                        controller: _newPasswordController,
-                        label: 'Password baru',
-                        show: _showNew,
-                        onToggle: () =>
-                            setState(() => _showNew = !_showNew),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) {
-                            return 'Password tidak boleh kosong';
-                          }
-                          if (v.length < 6) {
-                            return 'Password minimal 6 karakter';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPasswordField(
-                        controller: _confirmPasswordController,
-                        label: 'Konfirmasi password baru',
-                        show: _showConfirm,
-                        onToggle: () =>
-                            setState(() => _showConfirm = !_showConfirm),
-                        validator: (v) {
-                          if (v != _newPasswordController.text) {
-                            return 'Konfirmasi password tidak cocok';
-                          }
-                          return null;
-                        },
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.grey100, width: 1),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Ubah Kata Sandi',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildPasswordField(
+                              controller: _currentPasswordController,
+                              label: 'Kata Sandi Lama',
+                              show: _showCurrent,
+                              onToggle: () => setState(() => _showCurrent = !_showCurrent),
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Password tidak boleh kosong'
+                                  : null,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildPasswordField(
+                              controller: _newPasswordController,
+                              label: 'Kata Sandi Baru',
+                              show: _showNew,
+                              onToggle: () => setState(() => _showNew = !_showNew),
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return 'Password tidak boleh kosong';
+                                if (v.length < 6) return 'Password minimal 6 karakter';
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _buildPasswordField(
+                              controller: _confirmPasswordController,
+                              label: 'Konfirmasi Kata Sandi Baru',
+                              show: _showConfirm,
+                              onToggle: () => setState(() => _showConfirm = !_showConfirm),
+                              validator: (v) {
+                                if (v != _newPasswordController.text) return 'Konfirmasi password tidak cocok';
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
                       ),
 
                       // Password tips
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       _buildPasswordTips(),
 
                       // Error message
@@ -282,20 +290,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     );
   }
 
-  Widget _buildSectionLabel(String label) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.textSecondary,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
 
   Widget _buildPasswordField({
     required TextEditingController controller,
@@ -304,66 +298,76 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     required VoidCallback onToggle,
     required String? Function(String?) validator,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.softShadow,
-      ),
-      child: TextFormField(
-        controller: controller,
-        obscureText: !show,
-        validator: validator,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
         ),
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.lock_outline_rounded,
-              size: 20, color: AppTheme.grey400),
-          suffixIcon: IconButton(
-            onPressed: onToggle,
-            icon: Icon(
-              show
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              size: 20,
-              color: AppTheme.grey400,
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          obscureText: !show,
+          validator: validator,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'Masukkan $label',
+            hintStyle: const TextStyle(
+                color: AppTheme.grey400, fontWeight: FontWeight.w400),
+            prefixIcon: const Padding(
+              padding: EdgeInsets.fromLTRB(14, 0, 10, 0),
+              child: Icon(
+                Icons.lock_outline_rounded,
+                size: 20,
+                color: AppTheme.primaryGreen,
+              ),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            suffixIcon: IconButton(
+              icon: Icon(
+                show ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                color: AppTheme.grey400,
+                size: 20,
+              ),
+              onPressed: onToggle,
+              splashRadius: 20,
+            ),
+            filled: true,
+            fillColor: AppTheme.bgColor,
+            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.grey200),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.grey200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
             ),
           ),
-          labelStyle:
-              const TextStyle(fontSize: 13, color: AppTheme.grey400),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide:
-                const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-                color: Color(0xFFEF4444), width: 1.5),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-                color: Color(0xFFEF4444), width: 1.5),
-          ),
-          filled: true,
-          fillColor: AppTheme.white,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-      ),
+      ],
     );
   }
 

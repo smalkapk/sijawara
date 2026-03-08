@@ -20,6 +20,10 @@ import 'profile_page.dart';
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
+  /// Callback statis untuk trigger rekap ibadah dari widget Android.
+  /// Di-set oleh _HomePageState saat mount, null saat dispose.
+  static VoidCallback? openPrayerRecapFromWidget;
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -54,6 +58,9 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     initializeDateFormatting('id_ID', null);
+
+    // Register widget callback
+    HomePage.openPrayerRecapFromWidget = _openPrayerRecapFromWidget;
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -76,6 +83,20 @@ class _HomePageState extends State<HomePage>
 
     // Load data dari database
     _loadStudentData();
+
+    // Notifikasi maklumat sepenuhnya via FCM push (tidak perlu polling lokal)
+  }
+
+  /// Membuka prayer tracking dari widget Android (dengan point animation).
+  void _openPrayerRecapFromWidget() {
+    if (!mounted) return;
+    showPrayerTrackingSheet(
+      context,
+      date: DateTime.now(),
+      onPointsEarned: _onPointsEarned,
+      onPrayerSaved: _onPrayerSaved,
+      initialEditing: true,
+    );
   }
 
   /// Load data student — cek cache dulu, lalu fetch dari server jika cache kosong.
@@ -225,6 +246,12 @@ class _HomePageState extends State<HomePage>
     // Update streak immediately
     setState(() => _streak = result.streak);
 
+    // Update dots di horizontal calendar langsung tanpa refresh
+    try {
+      (_calendarKey.currentState as dynamic)
+          ?.updateDateCount(result.date, result.doneCount);
+    } catch (_) {}
+
     if (earnedPoints <= 0) return;
 
     final oldTotal = _totalPoints;
@@ -276,6 +303,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
+    HomePage.openPrayerRecapFromWidget = null;
     _fadeController.dispose();
     _pageController.dispose();
     _horizontalPageController.dispose();
@@ -522,11 +550,14 @@ class _HomePageState extends State<HomePage>
                               if (targetDate.isAfter(today)) {
                                 showFutureDateBlockedSheet(context, date);
                               } else {
+                                // Hari ini → langsung mode editing (Simpan Rekap)
+                                final isToday = targetDate.isAtSameMomentAs(today);
                                 showPrayerTrackingSheet(
                                   context,
                                   date: date,
                                   onPointsEarned: _onPointsEarned,
                                   onPrayerSaved: _onPrayerSaved,
+                                  initialEditing: isToday,
                                 );
                               }
                             },

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'fcm_service.dart';
 
 class AuthService {
   // Ganti dengan URL hosting Anda
@@ -83,6 +84,11 @@ class AuthService {
 
   /// Logout: hapus semua data sesi.
   static Future<void> logout() async {
+    // Hapus FCM token dari server sebelum clear prefs
+    try {
+      await FcmService.instance.removeTokenFromServer();
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
     // Simpan flag onboarding supaya tidak reset
     final onboarding = prefs.getBool('has_completed_initial_onboarding') ?? false;

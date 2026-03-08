@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../services/maklumat_service.dart';
+import '../services/alka_ai_service.dart';
 
 class GuruMaklumatFormPage extends StatefulWidget {
   const GuruMaklumatFormPage({super.key});
@@ -12,12 +13,14 @@ class GuruMaklumatFormPage extends StatefulWidget {
 }
 
 class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
   final _judulController = TextEditingController();
   final _deskripsiController = TextEditingController();
+  final _notifJudulController = TextEditingController();
+  final _notifIsiController = TextEditingController();
   final Set<TextEditingController> _showHelperFor = {};
   String _selectedPriority = 'Sedang'; // Default
   String _selectedTarget = 'keduanya'; // Default kirim kepada
@@ -25,6 +28,11 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
   bool _hasImage = false;
   bool _hasPdf = false;
   bool _isSaving = false;
+  bool _isGeneratingNotifJudul = false;
+  bool _isGeneratingNotifIsi = false;
+  TextEditingController? _processingController;
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
 
   final List<String> _priorities = ['Tinggi', 'Sedang', 'Rendah'];
   final List<Map<String, String>> _targets = [
@@ -45,9 +53,22 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
       curve: Curves.easeOutCubic,
     );
     _fadeController.forward();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _glowAnimation = CurvedAnimation(
+      parent: _glowController,
+      curve: Curves.easeInOut,
+    );
     _judulController.addListener(() {
       if (_judulController.text.trim().isNotEmpty && _showHelperFor.remove(_judulController)) {
         if (mounted) setState(() {});
+      }
+      // Auto-sync ke notif judul jika belum diedit manual
+      if (_selectedPriority == 'Tinggi' && _notifJudulController.text.isEmpty ||
+          _notifJudulController.text == _judulController.text.trim()) {
+        // Tetap sync
       }
     });
     _deskripsiController.addListener(() {
@@ -60,8 +81,11 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
   @override
   void dispose() {
     _fadeController.dispose();
+    _glowController.dispose();
     _judulController.dispose();
     _deskripsiController.dispose();
+    _notifJudulController.dispose();
+    _notifIsiController.dispose();
     super.dispose();
   }
 
@@ -102,6 +126,12 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
         prioritas: _selectedPriority,
         targetAudience: _selectedTarget,
         icon: _selectedIcon,
+        notifTitle: _selectedPriority == 'Tinggi' && _notifJudulController.text.trim().isNotEmpty
+            ? _notifJudulController.text.trim()
+            : null,
+        notifBody: _selectedPriority == 'Tinggi' && _notifIsiController.text.trim().isNotEmpty
+            ? _notifIsiController.text.trim()
+            : null,
       );
 
       if (mounted) {
@@ -133,7 +163,8 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
     }
   }
 
-  void _showEnhanceSheet(String content) {
+  void _showEnhanceSheet(TextEditingController controller) {
+    final content = controller.text;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -202,80 +233,25 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
                     // Options
                     Column(
                       children: [
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.grey100, width: 1),
-                            ),
-                            child: const Icon(Icons.auto_fix_high, size: 18, color: AppTheme.primaryGreen),
-                          ),
-                          title: const Text('Sempurnakan'),
-                          onTap: () => Navigator.pop(context),
+                        _buildEnhanceOption(
+                          Icons.auto_fix_high, 'Sempurnakan',
+                          () { Navigator.pop(context); _performAiAction(controller, 'sempurnakan'); },
                         ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.grey100, width: 1),
-                            ),
-                            child: const Icon(Icons.open_in_full, size: 18, color: AppTheme.primaryGreen),
-                          ),
-                          title: const Text('Perpanjang'),
-                          onTap: () => Navigator.pop(context),
+                        _buildEnhanceOption(
+                          Icons.open_in_full, 'Perpanjang',
+                          () { Navigator.pop(context); _performAiAction(controller, 'perpanjang'); },
                         ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.grey100, width: 1),
-                            ),
-                            child: const Icon(Icons.compress, size: 18, color: AppTheme.primaryGreen),
-                          ),
-                          title: const Text('Perpendek'),
-                          onTap: () => Navigator.pop(context),
+                        _buildEnhanceOption(
+                          Icons.compress, 'Perpendek',
+                          () { Navigator.pop(context); _performAiAction(controller, 'perpendek'); },
                         ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.grey100, width: 1),
-                            ),
-                            child: const Icon(Icons.language, size: 18, color: AppTheme.primaryGreen),
-                          ),
-                          title: const Text('Ubah bahasa inggris'),
-                          onTap: () => Navigator.pop(context),
+                        _buildEnhanceOption(
+                          Icons.language, 'Ubah Bahasa Inggris',
+                          () { Navigator.pop(context); _performAiAction(controller, 'english'); },
                         ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryGreen.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.grey100, width: 1),
-                            ),
-                            child: const Icon(Icons.translate, size: 18, color: AppTheme.primaryGreen),
-                          ),
-                          title: const Text('Ubah Bahasa Indonesia'),
-                          onTap: () => Navigator.pop(context),
+                        _buildEnhanceOption(
+                          Icons.translate, 'Ubah Bahasa Indonesia',
+                          () { Navigator.pop(context); _performAiAction(controller, 'indonesia'); },
                         ),
                       ],
                     ),
@@ -288,6 +264,77 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
         ),
       ),
     );
+  }
+
+  Widget _buildEnhanceOption(IconData icon, String label, VoidCallback onTap) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppTheme.primaryGreen.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.grey100, width: 1),
+        ),
+        child: Icon(icon, size: 18, color: AppTheme.primaryGreen),
+      ),
+      title: Text(label),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _performAiAction(TextEditingController controller, String action) async {
+    final original = controller.text.trim();
+    if (original.isEmpty) return;
+
+    setState(() => _processingController = controller);
+    _glowController.repeat(reverse: true);
+
+    final prompts = {
+      'sempurnakan':
+          'Kamu adalah asisten sekolah Islam. Sempurnakan teks berikut agar lebih baik, formal, dan jelas untuk pengumuman sekolah.\n\nTeks:\n$original\n\nSyarat:\n- Bahasa Indonesia\n- Tetap singkat dan jelas\n- Tidak ubah inti makna\n\nBalas HANYA teks yang sudah disempurnakan, tanpa penjelasan.',
+      'perpanjang':
+          'Kamu adalah asisten sekolah Islam. Perpanjang teks berikut dengan menambahkan detail atau konteks yang relevan untuk pengumuman sekolah.\n\nTeks:\n$original\n\nSyarat:\n- Bahasa Indonesia\n- Tambahkan detail yang relevan\n- Tetap formal dan informatif\n\nBalas HANYA teks yang sudah diperpanjang, tanpa penjelasan.',
+      'perpendek':
+          'Kamu adalah asisten sekolah Islam. Perpendek teks berikut menjadi lebih ringkas namun tetap menyampaikan inti informasi untuk pengumuman sekolah.\n\nTeks:\n$original\n\nSyarat:\n- Bahasa Indonesia\n- Pertahankan informasi pokok\n- Tidak lebih dari setengah panjang asli\n\nBalas HANYA teks yang sudah diperpendek, tanpa penjelasan.',
+      'english':
+          'Translate the following Indonesian school announcement text to natural English.\n\nText:\n$original\n\nRequirements:\n- Natural English\n- Maintain formal tone\n- Keep the original meaning\n\nReply with ONLY the translated text, without any explanation.',
+      'indonesia':
+          'Kamu adalah asisten sekolah Islam. Terjemahkan teks berikut ke Bahasa Indonesia yang baik dan benar untuk pengumuman sekolah.\n\nTeks:\n$original\n\nSyarat:\n- Bahasa Indonesia formal\n- Pertahankan makna asli\n\nBalas HANYA teks hasil terjemahan, tanpa penjelasan.',
+    };
+
+    try {
+      final result = await AlkaAiService.sendMessage([
+        LlmMessage(role: 'user', content: prompts[action]!),
+      ]);
+
+      if (!mounted) return;
+      final cleaned = result
+          .trim()
+          .replaceAll(RegExp(r'^["\u0027]+|["\u0027]+$'), '')
+          .trim();
+      controller.text = cleaned;
+      controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: cleaned.length),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal proses AI: $e'),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _processingController = null);
+        _glowController.stop();
+        _glowController.reset();
+      }
+    }
   }
 
   @override
@@ -314,6 +361,10 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
                       _buildPriorityPicker(),
                       const SizedBox(height: 16),
                       _buildTargetAudiencePicker(),
+                      if (_selectedPriority == 'Tinggi') ...[
+                        const SizedBox(height: 16),
+                        _buildNotificationCustomSection(),
+                      ],
                       const SizedBox(height: 16),
                       _buildIconPicker(),
                       const SizedBox(height: 16),
@@ -439,7 +490,7 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
                builder: (context, _) {
                  final hasText = controller.text.trim().isNotEmpty;
                  return GestureDetector(
-                   onTap: hasText ? () => _showEnhanceSheet(controller.text) : () => _triggerHelper(controller),
+                   onTap: hasText ? () => _showEnhanceSheet(controller) : () => _triggerHelper(controller),
                    child: Icon(
                      Icons.auto_awesome_rounded,
                      size: 16,
@@ -451,13 +502,34 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
            ]
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: AppTheme.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.grey100, width: 1),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        AnimatedBuilder(
+          animation: _glowAnimation,
+          builder: (context, child) {
+            final isProcessing = _processingController == controller;
+            return Container(
+              decoration: BoxDecoration(
+                color: AppTheme.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isProcessing
+                      ? AppTheme.primaryGreen.withOpacity(0.4 + _glowAnimation.value * 0.6)
+                      : AppTheme.grey100,
+                  width: isProcessing ? 1.5 : 1,
+                ),
+                boxShadow: isProcessing
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.primaryGreen.withOpacity(0.08 + _glowAnimation.value * 0.12),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : [],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: child,
+            );
+          },
           child: Row(
             crossAxisAlignment: maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
             children: [
@@ -654,6 +726,277 @@ class _GuruMaklumatFormPageState extends State<GuruMaklumatFormPage>
         return Icons.groups_rounded;
       default:
         return Icons.people_rounded;
+    }
+  }
+
+  // ════════════════════════════════════════
+  // Notifikasi Custom (Prioritas Tinggi)
+  // ════════════════════════════════════════
+
+  Widget _buildNotificationCustomSection() {
+    final isGenerating = _isGeneratingNotifJudul || _isGeneratingNotifIsi;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.grey100, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.notifications_active_rounded, size: 16, color: AppTheme.primaryGreen),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Konten Notifikasi Push',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Karena prioritas tinggi, kamu bisa atur isi push notification yang akan dikirim ke HP siswa/orang tua.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _buildNotifField(
+              label: 'Judul Notifikasi',
+              controller: _notifJudulController,
+              hint: 'Contoh: Pengumuman Penting!',
+              maxLines: 1,
+            ),
+            const SizedBox(height: 12),
+            _buildNotifField(
+              label: 'Isi Notifikasi',
+              controller: _notifIsiController,
+              hint: 'Contoh: Segera baca pengumuman terbaru',
+              maxLines: 2,
+            ),
+            const SizedBox(height: 14),
+            GestureDetector(
+              onTap: isGenerating ? null : _generateAllNotifContent,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isGenerating
+                      ? AppTheme.primaryGreen.withOpacity(0.05)
+                      : AppTheme.primaryGreen.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.primaryGreen.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isGenerating)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      )
+                    else
+                      const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 16,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isGenerating ? 'Sedang generate...' : 'Generate dengan AI',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isGenerating
+                            ? AppTheme.primaryGreen.withOpacity(0.6)
+                            : AppTheme.primaryGreen,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotifField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              maxLines > 1 ? Icons.message_rounded : Icons.title_rounded,
+              size: 14,
+              color: AppTheme.primaryGreen,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: AppTheme.bgColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.grey100, width: 1),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          child: TextField(
+            controller: controller,
+            maxLines: maxLines,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                fontSize: 13,
+                color: AppTheme.grey400.withOpacity(0.7),
+                fontWeight: FontWeight.w400,
+              ),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: maxLines > 1 ? 10 : 14),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _generateAllNotifContent() async {
+    final judul = _judulController.text.trim();
+    final deskripsi = _deskripsiController.text.trim();
+
+    if (judul.isEmpty && deskripsi.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Isi judul atau deskripsi maklumat dulu'),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isGeneratingNotifJudul = true;
+      _isGeneratingNotifIsi = true;
+    });
+
+    try {
+      final prompt =
+          'Kamu adalah asisten sekolah Islam. Buatkan judul dan isi push notification untuk pengumuman sekolah berikut.\n\n'
+          'Judul maklumat: $judul\n'
+          'Deskripsi maklumat: $deskripsi\n\n'
+          'Aturan:\n'
+          'Judul (Title):\n'
+          '- 1 baris saja, maksimal 40-50 karakter\n'
+          '- Langsung to the point, jelas, dan singkat\n'
+          '- Tidak pakai emoji\n'
+          '- Bahasa Indonesia\n\n'
+          'Isi / Body (Content):\n'
+          '- 1-2 baris, maksimal 100 karakter\n'
+          '- Singkat dan informatif\n'
+          '- Tidak pakai emoji\n'
+          '- Bahasa Indonesia\n'
+          '- Buat pembaca penasaran untuk membuka aplikasi\n\n'
+          'Format balasan HARUS persis seperti ini (tanpa penjelasan):\n'
+          'JUDUL: <judul notifikasi>\n'
+          'ISI: <isi notifikasi>';
+
+      final result = await AlkaAiService.sendMessage([
+        LlmMessage(role: 'user', content: prompt),
+      ]);
+
+      if (!mounted) return;
+
+      // Parse hasil: JUDUL: ... \n ISI: ...
+      final cleaned = result.trim();
+      String parsedJudul = '';
+      String parsedIsi = '';
+
+      final judulMatch = RegExp(r'JUDUL:\s*(.+)', caseSensitive: false).firstMatch(cleaned);
+      final isiMatch = RegExp(r'ISI:\s*(.+)', caseSensitive: false).firstMatch(cleaned);
+
+      if (judulMatch != null) {
+        parsedJudul = judulMatch.group(1)!.trim().replaceAll(RegExp(r'^["\u0027]+|["\u0027]+$'), '').trim();
+      }
+      if (isiMatch != null) {
+        parsedIsi = isiMatch.group(1)!.trim().replaceAll(RegExp(r'^["\u0027]+|["\u0027]+$'), '').trim();
+      }
+
+      // Fallback jika parsing gagal
+      if (parsedJudul.isEmpty && parsedIsi.isEmpty) {
+        final lines = cleaned.split('\n').where((l) => l.trim().isNotEmpty).toList();
+        if (lines.isNotEmpty) parsedJudul = lines[0].trim();
+        if (lines.length > 1) parsedIsi = lines[1].trim();
+      }
+
+      setState(() {
+        _notifJudulController.text = parsedJudul;
+        _notifIsiController.text = parsedIsi;
+        _isGeneratingNotifJudul = false;
+        _isGeneratingNotifIsi = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isGeneratingNotifJudul = false;
+        _isGeneratingNotifIsi = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal generate: $e'),
+          backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
     }
   }
 

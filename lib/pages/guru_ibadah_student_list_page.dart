@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../services/guru_ibadah_service.dart';
+import '../widgets/skeleton_loader.dart';
 import 'guru_ibadah_calendar_page.dart';
 
 class GuruIbadahStudentListPage extends StatefulWidget {
@@ -159,9 +160,7 @@ class _GuruIbadahStudentListPageState extends State<GuruIbadahStudentListPage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-      );
+      return _buildSkeletonList();
     }
 
     if (_errorMessage != null) {
@@ -287,6 +286,113 @@ class _GuruIbadahStudentListPageState extends State<GuruIbadahStudentListPage> {
     );
   }
 
+  Widget _buildSkeletonList() {
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      itemCount: 8,
+      itemBuilder: (context, index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.white,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            border: Border.all(color: AppTheme.grey100, width: 1),
+          ),
+          child: Row(
+            children: [
+              SkeletonLoader(
+                height: 44,
+                width: 44,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SkeletonLoader(height: 14, width: double.infinity),
+                    const SizedBox(height: 6),
+                    SkeletonLoader(
+                      height: 12,
+                      width: 80,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SkeletonLoader(
+                height: 32,
+                width: 32,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStudentAvatar(GuruIbadahStudent student) {
+    final initials = student.name.isNotEmpty ? student.name[0].toUpperCase() : '?';
+    final hasAvatar = student.avatarUrl.isNotEmpty;
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppTheme.softPurple.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: hasAvatar
+          ? ClipOval(
+              child: Image.network(
+                student.avatarUrl.startsWith('http')
+                    ? student.avatarUrl
+                    : 'https://portal-smalka.com/${student.avatarUrl}',
+                width: 44,
+                height: 44,
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) {
+                  if (progress == null) return child;
+                  return Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.softPurple.withOpacity(0.5),
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.softPurple,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : Center(
+              child: Text(
+                initials,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.softPurple,
+                ),
+              ),
+            ),
+    );
+  }
+
   Widget _buildStudentCard(GuruIbadahStudent student) {
     return GestureDetector(
       onTap: () {
@@ -312,24 +418,7 @@ class _GuruIbadahStudentListPageState extends State<GuruIbadahStudentListPage> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.softPurple.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  student.name.isNotEmpty ? student.name[0] : '?',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.softPurple,
-                  ),
-                ),
-              ),
-            ),
+            _buildStudentAvatar(student),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

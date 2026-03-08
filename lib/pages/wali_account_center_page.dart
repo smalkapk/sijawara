@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/wali_service.dart';
+import '../widgets/skeleton_loader.dart';
 
 class WaliAccountCenterPage extends StatefulWidget {
   const WaliAccountCenterPage({super.key});
@@ -241,7 +242,7 @@ class _WaliAccountCenterPageState extends State<WaliAccountCenterPage>
       decoration: BoxDecoration(
         gradient: AppTheme.mainGradient,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        boxShadow: AppTheme.greenGlow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Row(
         children: [
@@ -322,7 +323,7 @@ class _WaliAccountCenterPageState extends State<WaliAccountCenterPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Material(
         color: Colors.transparent,
@@ -467,7 +468,7 @@ class _WaliAccountCenterPageState extends State<WaliAccountCenterPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         children: [
@@ -499,18 +500,37 @@ class _WaliAccountCenterPageState extends State<WaliAccountCenterPage>
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircularProgressIndicator(color: AppTheme.primaryGreen),
-          SizedBox(height: 16),
-          Text(
-            'Memuat data akun...',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 14,
-            ),
+          const SizedBox(height: 8),
+          SkeletonLoader(
+            height: 82,
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SkeletonLoader(height: 20, width: 150, borderRadius: BorderRadius.circular(6)),
+              SkeletonLoader(height: 24, width: 60, borderRadius: BorderRadius.circular(8)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SkeletonLoader(
+            height: 82,
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+          ),
+          const SizedBox(height: 12),
+          SkeletonLoader(
+            height: 82,
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(AppTheme.radiusSm),
           ),
         ],
       ),

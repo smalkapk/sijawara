@@ -96,12 +96,14 @@ class TahfidzStudent {
   final String nis;
   final String name;
   final String className;
+  final String? avatarUrl;
 
   TahfidzStudent({
     required this.studentId,
     required this.nis,
     required this.name,
     this.className = '',
+    this.avatarUrl,
   });
 
   factory TahfidzStudent.fromJson(Map<String, dynamic> json) {
@@ -112,6 +114,7 @@ class TahfidzStudent {
       nis: json['nis']?.toString() ?? '',
       name: json['name'] as String? ?? '',
       className: json['class_name'] as String? ?? '',
+      avatarUrl: json['avatar_url'] as String?,
     );
   }
 
@@ -120,6 +123,7 @@ class TahfidzStudent {
         'nis': nis,
         'name': name,
         'class_name': className,
+        'avatar_url': avatarUrl ?? '',
       };
 }
 

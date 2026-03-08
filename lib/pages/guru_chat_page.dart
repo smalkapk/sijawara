@@ -6,19 +6,23 @@ import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../widgets/skeleton_loader.dart';
 import '../services/chat_service.dart';
+import '../services/fcm_service.dart';
 import '../widgets/chat_attachments.dart';
+import 'chat_detail_page.dart';
 
 /// Halaman chat Guru → Wali (WhatsApp-style)
 /// Dipanggil dari GuruDiskusiWaliPage dengan waliId & waliName
 class GuruChatPage extends StatefulWidget {
   final int waliId;
   final String waliName;
+  final String? waliAvatarUrl;
   final String childrenNames;
 
   const GuruChatPage({
     super.key,
     required this.waliId,
     required this.waliName,
+    this.waliAvatarUrl,
     this.childrenNames = '',
   });
 
@@ -26,7 +30,8 @@ class GuruChatPage extends StatefulWidget {
   State<GuruChatPage> createState() => _GuruChatPageState();
 }
 
-class _GuruChatPageState extends State<GuruChatPage> {
+class _GuruChatPageState extends State<GuruChatPage>
+    with WidgetsBindingObserver {
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocus = FocusNode();
@@ -38,6 +43,9 @@ class _GuruChatPageState extends State<GuruChatPage> {
   bool _isPartnerTyping = false;
   ChatMessage? _replyingTo;
   int _currentUserId = 0;
+
+  // Pin state
+  Map<String, dynamic>? _pinnedMessage;
 
   // WebSocket
   ChatWebSocket? _ws;
@@ -51,10 +59,38 @@ class _GuruChatPageState extends State<GuruChatPage> {
     return parts.isNotEmpty ? parts[0][0].toUpperCase() : '?';
   }
 
+  String get _waliAvatarResolvedUrl {
+    final url = widget.waliAvatarUrl?.trim() ?? '';
+    if (url.isEmpty) return '';
+    return url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Set active chat partner agar FCM tidak tampilkan notifikasi
+    FcmService.instance.activeChatPartnerId = widget.waliId;
     _init();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App kembali ke foreground: set kembali activeChatPartnerId
+      FcmService.instance.activeChatPartnerId = widget.waliId;
+      // Mark pesan dibaca saat kembali ke foreground
+      ChatService.markReadHttp(partnerId: widget.waliId);
+      // Reconnect WS jika terputus di background
+      if (_ws == null || !_ws!.isConnected) {
+        _connectWebSocket();
+      }
+    } else if (state == AppLifecycleState.paused) {
+      // App masuk background: clear activeChatPartnerId
+      // agar FCM notification tetap muncul saat app di background
+      FcmService.instance.activeChatPartnerId = null;
+    }
   }
 
   Future<void> _init() async {
@@ -70,6 +106,7 @@ class _GuruChatPageState extends State<GuruChatPage> {
 
       _scrollToBottom(animate: false);
       ChatService.markReadHttp(partnerId: widget.waliId);
+      _loadPinnedMessage();
       _connectWebSocket();
     } catch (e) {
       if (!mounted) return;
@@ -173,6 +210,27 @@ class _GuruChatPageState extends State<GuruChatPage> {
           if (mounted) {
             setState(() => _isPartnerTyping = typingData['is_typing'] == true);
           }
+        }
+        break;
+
+      case 'message_pinned':
+        final pinData = data['data'] as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _pinnedMessage = {
+              'message_id': pinData['message_id'],
+              'pinned_by': pinData['pinned_by'],
+              'pinned_by_name': pinData['pinned_by_name'] ?? '',
+              'pin_preview': pinData['pin_preview'] ?? '',
+              'sender_id': pinData['pin_sender_id'],
+            };
+          });
+        }
+        break;
+
+      case 'message_unpinned':
+        if (mounted) {
+          setState(() => _pinnedMessage = null);
         }
         break;
     }
@@ -309,12 +367,99 @@ class _GuruChatPageState extends State<GuruChatPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Clear active chat partner
+    FcmService.instance.activeChatPartnerId = null;
     _msgController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();
     _wsSub?.cancel();
     _ws?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPinnedMessage() async {
+    try {
+      final pinned = await ChatService.getPinnedMessage(partnerId: widget.waliId);
+      if (mounted) {
+        setState(() => _pinnedMessage = pinned);
+      }
+    } catch (e) {
+      debugPrint('Gagal load pinned message: $e');
+    }
+  }
+
+  Future<void> _pinMessage(ChatMessage msg) async {
+    try {
+      await ChatService.pinMessage(
+        messageId: msg.id,
+        partnerId: widget.waliId,
+      );
+
+      // Build preview locally
+      String preview = msg.message;
+      if (msg.isImage) preview = '📷 Foto';
+      if (msg.isDocument) preview = '📄 ${msg.attachmentName ?? "Dokumen"}';
+
+      if (mounted) {
+        setState(() {
+          _pinnedMessage = {
+            'message_id': msg.id,
+            'pinned_by': _currentUserId,
+            'pin_preview': preview,
+            'sender_id': msg.senderId,
+          };
+        });
+      }
+
+      // Broadcast via WS
+      _ws?.pinMessageWs(
+        partnerId: widget.waliId,
+        messageId: msg.id,
+        pinPreview: preview,
+        pinSenderId: msg.senderId,
+      );
+    } catch (e) {
+      if (mounted) {
+        _showError('Gagal pin pesan: $e');
+      }
+    }
+  }
+
+  Future<void> _unpinMessage() async {
+    try {
+      await ChatService.unpinMessage(partnerId: widget.waliId);
+      if (mounted) {
+        setState(() {
+          _pinnedMessage = null;
+        });
+      }
+      _ws?.unpinMessageWs(partnerId: widget.waliId);
+    } catch (e) {
+      if (mounted) {
+        _showError('Gagal unpin pesan: $e');
+      }
+    }
+  }
+
+  void _scrollToPinnedMessage() {
+    if (_pinnedMessage == null) return;
+    final pinnedId = _pinnedMessage!['message_id'];
+    final idx = _messages.indexWhere((m) => m.id == pinnedId);
+    if (idx == -1) return;
+
+    // reverse list: index in ListView = _messages.length - 1 - idx
+    final reverseIdx = _messages.length - 1 - idx;
+    // Approximate scroll to the target
+    if (_scrollController.hasClients) {
+      // Each bubble ~80px estimate
+      final estimate = reverseIdx * 80.0;
+      _scrollController.animateTo(
+        estimate,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
@@ -325,10 +470,89 @@ class _GuruChatPageState extends State<GuruChatPage> {
         child: Column(
           children: [
             _buildAppBar(),
+            _buildPinnedBar(),
             Expanded(
               child: _isLoading ? _buildLoadingState() : _buildChatArea(),
             ),
             _buildMessageInput(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPinnedBar() {
+    if (_pinnedMessage == null) return const SizedBox.shrink();
+
+    final preview = _pinnedMessage!['pin_preview'] as String? ?? 'Pesan';
+    final senderId = _pinnedMessage!['sender_id'];
+    final senderName = senderId == _currentUserId ? 'Anda' : widget.waliName;
+
+    return GestureDetector(
+      onTap: _scrollToPinnedMessage,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.white,
+          border: Border(
+            bottom: BorderSide(color: AppTheme.grey100, width: 1),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.push_pin_rounded,
+                size: 16, color: AppTheme.primaryGreen),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Pesan disematkan',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    '$senderName: $preview',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _unpinMessage,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppTheme.grey100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.close_rounded,
+                    size: 16, color: AppTheme.grey400),
+              ),
+            ),
           ],
         ),
       ),
@@ -364,18 +588,7 @@ class _GuruChatPageState extends State<GuruChatPage> {
             ),
           ),
           const SizedBox(width: 14),
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.12),
-            child: Text(
-              _initials,
-              style: const TextStyle(
-                color: AppTheme.primaryGreen,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
-            ),
-          ),
+          _buildWaliHeaderAvatar(),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -422,6 +635,41 @@ class _GuruChatPageState extends State<GuruChatPage> {
             onPressed: () {},
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildWaliHeaderAvatar() {
+    if (_waliAvatarResolvedUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          _waliAvatarResolvedUrl,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return _buildWaliHeaderInitials();
+          },
+          errorBuilder: (_, __, ___) => _buildWaliHeaderInitials(),
+        ),
+      );
+    }
+
+    return _buildWaliHeaderInitials();
+  }
+
+  Widget _buildWaliHeaderInitials() {
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.12),
+      child: Text(
+        _initials,
+        style: const TextStyle(
+          color: AppTheme.primaryGreen,
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+        ),
       ),
     );
   }
@@ -610,6 +858,9 @@ class _GuruChatPageState extends State<GuruChatPage> {
   }
 
   void _showMessageOptions(ChatMessage msg) {
+    final isCurrentlyPinned = _pinnedMessage != null &&
+        _pinnedMessage!['message_id'] == msg.id;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -617,6 +868,7 @@ class _GuruChatPageState extends State<GuruChatPage> {
       builder: (_) => _MessageOptionsSheet(
         msg: msg,
         partnerName: widget.waliName,
+        isPinned: isCurrentlyPinned,
         onReply: () {
           Navigator.pop(context);
           setState(() => _replyingTo = msg);
@@ -648,11 +900,25 @@ class _GuruChatPageState extends State<GuruChatPage> {
             : null,
         onPin: () {
           Navigator.pop(context);
-          // TODO: implementasi pin pesan
+          if (isCurrentlyPinned) {
+            _unpinMessage();
+          } else {
+            _pinMessage(msg);
+          }
         },
         onDetail: () {
           Navigator.pop(context);
-          // TODO: implementasi detail pesan
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatDetailPage(
+                message: msg,
+                senderName: widget.waliName,
+                partnerName: widget.waliName,
+                currentUserId: _currentUserId,
+              ),
+            ),
+          );
         },
       ),
     );
@@ -1150,6 +1416,7 @@ class _MessageOptionsSheet extends StatelessWidget {
   final VoidCallback? onDelete;
   final VoidCallback onPin;
   final VoidCallback onDetail;
+  final bool isPinned;
 
   const _MessageOptionsSheet({
     required this.msg,
@@ -1158,6 +1425,7 @@ class _MessageOptionsSheet extends StatelessWidget {
     this.onDelete,
     required this.onPin,
     required this.onDetail,
+    this.isPinned = false,
   });
 
   @override
@@ -1268,11 +1536,11 @@ class _MessageOptionsSheet extends StatelessWidget {
               onTap: onDelete!,
             ),
 
-          // Opsi: Pin
+          // Opsi: Pin / Unpin
           _OptionTile(
-            icon: Icons.push_pin_outlined,
-            iconColor: AppTheme.textSecondary,
-            label: 'Pin Pesan',
+            icon: isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+            iconColor: isPinned ? Colors.orange : AppTheme.textSecondary,
+            label: isPinned ? 'Lepas Pin' : 'Pin Pesan',
             onTap: onPin,
           ),
 

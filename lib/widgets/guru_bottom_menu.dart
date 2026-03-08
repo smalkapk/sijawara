@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/connectivity_service.dart';
+import 'connectivity_wrapper.dart';
 import 'wali_bottom_menu.dart'; // To reuse BottomMenuScrollHandler
 
 class GuruBottomMenu extends StatefulWidget {
@@ -21,10 +23,40 @@ class GuruBottomMenu extends StatefulWidget {
 
 class _GuruBottomMenuState extends State<GuruBottomMenu> {
   @override
+  void initState() {
+    super.initState();
+    ConnectivityService.instance.isConnected.addListener(_onConnectivityChanged);
+  }
+
+  @override
+  void dispose() {
+    ConnectivityService.instance.isConnected.removeListener(_onConnectivityChanged);
+    super.dispose();
+  }
+
+  void _onConnectivityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final isOffline = !ConnectivityService.instance.isConnected.value;
+    final navBarHeight = 62.0 + bottomPadding;
 
-    return AnimatedSlide(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isOffline)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            curve: widget.isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
+            transform: widget.isVisible
+                ? Matrix4.identity()
+                : Matrix4.translationValues(0, navBarHeight - 40, 0),
+            child: const OfflineBanner(),
+          ),
+        AnimatedSlide(
       offset: widget.isVisible ? Offset.zero : const Offset(0, 1.5),
       duration: const Duration(milliseconds: 350),
       curve: widget.isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
@@ -82,6 +114,8 @@ class _GuruBottomMenuState extends State<GuruBottomMenu> {
           ),
         ),
       ),
+      ),
+      ],
     );
   }
 }

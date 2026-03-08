@@ -225,25 +225,34 @@ class MaklumatService {
     String icon = 'campaign',
     String? imageUrl,
     String? pdfUrl,
+    String? notifTitle,
+    String? notifBody,
   }) async {
     try {
       final token = await AuthService.getToken();
+      final payload = {
+        'judul': judul,
+        'deskripsi': deskripsi,
+        'kategori': kategori,
+        'prioritas': prioritas,
+        'target_audience': targetAudience,
+        'icon': icon,
+        'image_url': imageUrl,
+        'pdf_url': pdfUrl,
+      };
+      if (notifTitle != null && notifTitle.isNotEmpty) {
+        payload['notif_title'] = notifTitle;
+      }
+      if (notifBody != null && notifBody.isNotEmpty) {
+        payload['notif_body'] = notifBody;
+      }
       final response = await http.post(
         Uri.parse('$_baseUrl/maklumat.php'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'judul': judul,
-          'deskripsi': deskripsi,
-          'kategori': kategori,
-          'prioritas': prioritas,
-          'target_audience': targetAudience,
-          'icon': icon,
-          'image_url': imageUrl,
-          'pdf_url': pdfUrl,
-        }),
+        body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 15));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;

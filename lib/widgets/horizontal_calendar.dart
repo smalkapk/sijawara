@@ -3,6 +3,10 @@ import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../services/prayer_service.dart';
 
+abstract class CalendarDateCountUpdater {
+  void updateDateCount(String dateKey, int count);
+}
+
 class HorizontalCalendar extends StatefulWidget {
   final ValueChanged<DateTime>? onDateTap;
 
@@ -13,7 +17,8 @@ class HorizontalCalendar extends StatefulWidget {
 }
 
 class _HorizontalCalendarState extends State<HorizontalCalendar>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin
+  implements CalendarDateCountUpdater {
   DateTime selectedDate = DateTime.now();
   late ScrollController _scrollController;
   late AnimationController _nudgeController;
@@ -120,6 +125,15 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
     await _loadPrayerData();
   }
 
+  /// Update dots untuk tanggal tertentu secara langsung (tanpa fetch ulang)
+  @override
+  void updateDateCount(String dateKey, int count) {
+    if (!mounted) return;
+    setState(() {
+      _prayerData[dateKey] = count;
+    });
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -162,11 +176,12 @@ class _HorizontalCalendarState extends State<HorizontalCalendar>
           final isSelected = DateUtils.isSameDay(date, selectedDate);
           final isToday = DateUtils.isSameDay(date, DateTime.now());
           final dateKey = DateFormat('yyyy-MM-dd').format(date);
-          final prayerCount = _prayerData[dateKey] ?? 0;
+          // Hanya hitung shalat (5 waktu), bukan kebaikan lain
+          final prayerCount = (_prayerData[dateKey] ?? 0).clamp(0, 5);
 
           return GestureDetector(
             onTap: () {
-              setState(() => selectedDate = date);
+              // Tidak mengubah selectedDate — efek hijau tetap di hari ini
               widget.onDateTap?.call(date);
             },
             child: AnimatedContainer(

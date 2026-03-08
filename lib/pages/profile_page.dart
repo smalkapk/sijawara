@@ -38,6 +38,7 @@ class _ProfilePageState extends State<ProfilePage>
   String _studentName = '';
   String _studentClass = '';
   String _schoolName = 'SMA Muhammadiyah Al Kautsar Program Khusus';
+  String? _avatarUrl;
   int _totalPoints = 0;
   int _currentLevel = 1;
   int _pointsForNextLevel = 300;
@@ -98,6 +99,7 @@ class _ProfilePageState extends State<ProfilePage>
         _studentName = cached.profile.name;
         _studentClass = cached.profile.className;
         _schoolName = cached.profile.schoolName;
+        _avatarUrl = cached.profile.avatarUrl;
         _totalPoints = cached.profile.totalPoints;
         _currentLevel = cached.profile.currentLevel;
         _pointsForNextLevel = cached.profile.pointsForNextLevel;
@@ -131,6 +133,7 @@ class _ProfilePageState extends State<ProfilePage>
         _studentName = data.profile.name;
         _studentClass = data.profile.className;
         _schoolName = data.profile.schoolName;
+        _avatarUrl = data.profile.avatarUrl;
         _totalPoints = data.profile.totalPoints;
         _currentLevel = data.profile.currentLevel;
         _pointsForNextLevel = data.profile.pointsForNextLevel;
@@ -853,15 +856,12 @@ class _ProfilePageState extends State<ProfilePage>
               width: 2.5,
             ),
           ),
-          child: Center(
-            child: Text(
-              _getInitials(entry.name),
-              style: TextStyle(
-                fontSize: rank == 1 ? 14 : 12,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.white,
-              ),
-            ),
+          child: _buildAvatarImage(
+            avatarUrl: entry.avatarUrl,
+            name: entry.name,
+            size: rank == 1 ? 44 : 36,
+            fontSize: rank == 1 ? 14 : 12,
+            textColor: AppTheme.white,
           ),
         ),
         const SizedBox(height: 6),
@@ -959,14 +959,14 @@ class _ProfilePageState extends State<ProfilePage>
                 color: entry.isMe ? null : AppTheme.grey100,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(
-                child: Text(
-                  _getInitials(entry.name),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: entry.isMe ? AppTheme.white : AppTheme.grey600,
-                  ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: _buildAvatarImage(
+                  avatarUrl: entry.avatarUrl,
+                  name: entry.name,
+                  size: 38,
+                  fontSize: 12,
+                  textColor: entry.isMe ? AppTheme.white : AppTheme.grey600,
                 ),
               ),
             ),
@@ -1130,21 +1130,15 @@ class _ProfilePageState extends State<ProfilePage>
                         width: 2,
                       ),
                     ),
-                    child: Center(
-                      child: _studentName.isNotEmpty
-                          ? Text(
-                              _getInitials(_studentName),
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person_rounded,
-                              color: AppTheme.white,
-                              size: 32,
-                            ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: _buildAvatarImage(
+                        avatarUrl: _avatarUrl,
+                        name: _studentName,
+                        size: 60,
+                        fontSize: 22,
+                        textColor: AppTheme.white,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1878,6 +1872,87 @@ class _ProfilePageState extends State<ProfilePage>
   String _getInitials(String name) {
     return name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join();
   }
+
+  /// Build avatar image from URL or fallback to initials
+  Widget _buildAvatarImage({
+    String? avatarUrl,
+    required String name,
+    required double size,
+    double fontSize = 14,
+    Color textColor = AppTheme.white,
+  }) {
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+    if (hasAvatar) {
+      final url = avatarUrl.startsWith('http')
+          ? avatarUrl
+          : 'https://portal-smalka.com/$avatarUrl';
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          loadingBuilder: (_, child, progress) {
+            if (progress == null) return child;
+            return SizedBox(
+              width: size,
+              height: size,
+              child: Center(
+                child: SizedBox(
+                  width: size * 0.4,
+                  height: size * 0.4,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: textColor.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => _buildInitialsWidget(
+            name: name,
+            size: size,
+            fontSize: fontSize,
+            textColor: textColor,
+          ),
+        ),
+      );
+    }
+    return _buildInitialsWidget(
+      name: name,
+      size: size,
+      fontSize: fontSize,
+      textColor: textColor,
+    );
+  }
+
+  Widget _buildInitialsWidget({
+    required String name,
+    required double size,
+    double fontSize = 14,
+    Color textColor = AppTheme.white,
+  }) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: name.isNotEmpty
+            ? Text(
+                _getInitials(name),
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
+              )
+            : Icon(
+                Icons.person_rounded,
+                color: textColor,
+                size: size * 0.5,
+              ),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════
@@ -1976,15 +2051,10 @@ class _StudentDetailSheetState extends State<_StudentDetailSheet> {
                             width: 3,
                           ),
                         ),
-                        child: Center(
-                          child: Text(
-                            widget.getInitials(widget.entry.name),
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.white,
-                            ),
-                          ),
+                        child: _buildSheetAvatar(
+                          avatarUrl: widget.entry.avatarUrl,
+                          name: widget.entry.name,
+                          size: 74,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -2187,6 +2257,56 @@ class _StudentDetailSheetState extends State<_StudentDetailSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Avatar image helper for detail sheet
+  Widget _buildSheetAvatar({
+    String? avatarUrl,
+    required String name,
+    required double size,
+  }) {
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
+    if (hasAvatar) {
+      final url = avatarUrl.startsWith('http')
+          ? avatarUrl
+          : 'https://portal-smalka.com/$avatarUrl';
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => SizedBox(
+            width: size,
+            height: size,
+            child: Center(
+              child: Text(
+                widget.getInitials(name),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Text(
+          widget.getInitials(name),
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.white,
+          ),
+        ),
       ),
     );
   }

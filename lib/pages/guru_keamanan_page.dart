@@ -122,6 +122,8 @@ class _GuruKeamananPageState extends State<GuruKeamananPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildInfoBanner(),
+          const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -171,6 +173,8 @@ class _GuruKeamananPageState extends State<GuruKeamananPage> {
             ),
           ),
           const SizedBox(height: 24),
+          _buildPasswordTips(),
+          const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -197,6 +201,108 @@ class _GuruKeamananPageState extends State<GuruKeamananPage> {
       ),
     );
   }
+
+  Widget _buildInfoBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryGreen.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: AppTheme.primaryGreen.withOpacity(0.2), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: AppTheme.mainGradient,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.shield_outlined,
+                size: 18, color: AppTheme.white),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Pastikan kamu menggunakan password yang kuat dan tidak mudah ditebak oleh orang lain.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPasswordTips() {
+    final tips = [
+      'Minimal 6 karakter',
+      'Kombinasikan huruf besar, kecil, dan angka',
+      'Jangan gunakan tanggal lahir atau nama',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.lightbulb_outline_rounded,
+                  size: 16, color: AppTheme.gold),
+              SizedBox(width: 8),
+              Text(
+                'Tips Password Kuat',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...tips.map((tip) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded,
+                        size: 14, color: AppTheme.primaryGreen),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        tip,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildPasswordField({
     required TextEditingController controller,

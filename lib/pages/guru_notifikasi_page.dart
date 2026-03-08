@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 
 class GuruNotifikasiPage extends StatefulWidget {
@@ -9,8 +11,54 @@ class GuruNotifikasiPage extends StatefulWidget {
 }
 
 class _GuruNotifikasiPageState extends State<GuruNotifikasiPage> {
-  bool _pushEnabled = true;
-  bool _emailEnabled = false;
+  // Keseluruhan notifikasi
+  bool _masterEnabled = true;
+
+  // Aplikasi
+  bool _diskusiWaliMurid = true;
+
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _masterEnabled = prefs.getBool('guru_notif_master') ?? true;
+      _diskusiWaliMurid = prefs.getBool('guru_notif_diskusi_wali_murid') ?? true;
+    });
+  }
+
+  Future<void> _savePrefs() async {
+    setState(() => _isSaving = true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('guru_notif_master', _masterEnabled);
+    await prefs.setBool('guru_notif_diskusi_wali_murid', _diskusiWaliMurid);
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: AppTheme.white, size: 18),
+            SizedBox(width: 8),
+            Text('Pengaturan notifikasi disimpan',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        backgroundColor: AppTheme.primaryGreen,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +67,45 @@ class _GuruNotifikasiPageState extends State<GuruNotifikasiPage> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildAppBar(),
+            _buildHeader(),
             Expanded(
-              child: _buildContent(),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                child: Column(
+                  children: [
+                    // Master toggle card
+                    _buildMasterToggle(),
+                    const SizedBox(height: 20),
+
+                    // Aplikasi section
+                    _buildSectionHeader(
+                      icon: Icons.notifications_rounded,
+                      iconGradient: AppTheme.sunsetGradient,
+                      title: 'Notifikasi Aplikasi',
+                      subtitle: 'Aktivitas & info dari aplikasi',
+                      showIcon: false,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildCard([
+                      _buildToggleItem(
+                        label: 'Diskusi Wali Murid',
+                        icon: Icons.forum_outlined,
+                        iconColor: AppTheme.softBlue,
+                        value: _diskusiWaliMurid,
+                        onChanged: _masterEnabled
+                            ? (v) => setState(() => _diskusiWaliMurid = v)
+                            : null,
+                        showIcon: false,
+                      ),
+                    ]),
+                    const SizedBox(height: 28),
+                    _buildSaveButton(),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -29,32 +113,35 @@ class _GuruNotifikasiPageState extends State<GuruNotifikasiPage> {
     );
   }
 
-  Widget _buildAppBar() {
+  Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 24, 12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 24, 16),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(
-              Icons.arrow_back_ios_rounded,
-              size: 20,
-              color: AppTheme.textPrimary,
+            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                size: 18, color: AppTheme.textPrimary),
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.white,
+              padding: const EdgeInsets.all(10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
-            splashRadius: 22,
           ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.notifications_rounded,
-                        size: 14, color: AppTheme.warmOrange),
-                    const SizedBox(width: 6),
+                    Icon(Icons.notifications_none_rounded,
+                        size: 13, color: AppTheme.textSecondary),
+                    const SizedBox(width: 5),
                     Text(
                       'Pengaturan',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppTheme.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
@@ -65,7 +152,7 @@ class _GuruNotifikasiPageState extends State<GuruNotifikasiPage> {
                 Text(
                   'Notifikasi',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.3,
                       ),
@@ -78,106 +165,240 @@ class _GuruNotifikasiPageState extends State<GuruNotifikasiPage> {
     );
   }
 
-  Widget _buildContent() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: AppTheme.white,
-              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-              border: Border.all(color: AppTheme.grey100, width: 1),
-            ),
-            child: Column(
-              children: [
-                _buildSwitchTile(
-                  icon: Icons.phone_android_rounded,
-                  title: 'Notifikasi Push',
-                  subtitle: 'Pemberitahuan langsung di perangkat',
-                  value: _pushEnabled,
-                  onChanged: (val) => setState(() => _pushEnabled = val),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Divider(height: 1, color: AppTheme.grey100),
-                ),
-                _buildSwitchTile(
-                  icon: Icons.email_rounded,
-                  title: 'Email',
-                  subtitle: 'Pemberitahuan rangkuman via email',
-                  value: _emailEnabled,
-                  onChanged: (val) => setState(() => _emailEnabled = val),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              'Pengaturan ini hanya akan berlaku di perangkat ini saja.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ),
-        ],
+  Widget _buildMasterToggle() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: _masterEnabled ? AppTheme.mainGradient : null,
+        color: _masterEnabled ? null : AppTheme.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow:
+            _masterEnabled ? AppTheme.greenGlow : AppTheme.softShadow,
       ),
-    );
-  }
-
-  Widget _buildSwitchTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppTheme.warmOrange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: _masterEnabled
+                  ? AppTheme.white.withOpacity(0.2)
+                  : AppTheme.grey100,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, size: 18, color: AppTheme.warmOrange),
+            child: Icon(
+              Icons.notifications_active_rounded,
+              size: 22,
+              color:
+                  _masterEnabled ? AppTheme.white : AppTheme.grey400,
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
+                  'Aktifkan Semua Notifikasi',
+                  style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    color:
+                        _masterEnabled ? AppTheme.white : AppTheme.textPrimary,
                   ),
                 ),
+                const SizedBox(height: 3),
                 Text(
-                  subtitle,
-                  style: const TextStyle(
+                  _masterEnabled
+                      ? 'Notifikasi aktif'
+                      : 'Semua notifikasi dinonaktifkan',
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.textSecondary,
+                    color: _masterEnabled
+                        ? AppTheme.white.withOpacity(0.75)
+                        : AppTheme.grey400,
                   ),
                 ),
               ],
             ),
           ),
           Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppTheme.primaryGreen,
+            value: _masterEnabled,
+            onChanged: (v) {
+              HapticFeedback.lightImpact();
+              setState(() => _masterEnabled = v);
+            },
+            activeColor: AppTheme.white,
+            activeTrackColor: AppTheme.white.withOpacity(0.4),
+            inactiveThumbColor: AppTheme.grey400,
+            inactiveTrackColor: AppTheme.grey100,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required IconData icon,
+    required LinearGradient iconGradient,
+    required String title,
+    required String subtitle,
+    bool showIcon = true,
+  }) {
+    final children = <Widget>[];
+    if (showIcon) {
+      children.addAll([
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: iconGradient,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 16, color: AppTheme.white),
+        ),
+        const SizedBox(width: 10),
+      ]);
+    }
+
+    children.add(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.grey400,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Row(children: children);
+  }
+
+  Widget _buildCard(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildToggleItem({
+    required String label,
+    required IconData icon,
+    required Color iconColor,
+    required bool value,
+    required void Function(bool)? onChanged,
+    bool showIcon = true,
+  }) {
+    final disabled = onChanged == null;
+    final rowChildren = <Widget>[];
+
+    if (showIcon) {
+      rowChildren.addAll([
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: disabled
+                ? AppTheme.grey100
+                : iconColor.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon,
+              size: 16, color: disabled ? AppTheme.grey200 : iconColor),
+        ),
+        const SizedBox(width: 12),
+      ]);
+    }
+
+    rowChildren.addAll([
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: disabled ? AppTheme.grey200 : AppTheme.textPrimary,
+          ),
+        ),
+      ),
+      Switch(
+        value: value && !disabled,
+        onChanged: onChanged != null
+            ? (v) {
+                HapticFeedback.lightImpact();
+                onChanged(v);
+              }
+            : null,
+        activeColor: AppTheme.white,
+        activeTrackColor: AppTheme.primaryGreen,
+        inactiveThumbColor: AppTheme.grey200,
+        inactiveTrackColor: AppTheme.grey100,
+      ),
+    ]);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(children: rowChildren),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Divider(height: 1, color: AppTheme.grey100),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isSaving
+            ? null
+            : () {
+                HapticFeedback.mediumImpact();
+                _savePrefs();
+              },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.primaryGreen,
+          foregroundColor: AppTheme.white,
+          disabledBackgroundColor: AppTheme.grey200,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 0,
+        ),
+        child: _isSaving
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppTheme.white),
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.save_rounded, size: 18),
+                  SizedBox(width: 8),
+                  Text('Simpan Pengaturan',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                ],
+              ),
       ),
     );
   }

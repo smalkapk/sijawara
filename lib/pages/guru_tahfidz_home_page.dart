@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
+import '../services/guru_profile_service.dart';
 import 'login_page.dart';
 import '../widgets/wali_guru_input.dart';
 import 'guru_tahfidz_quran.dart';
@@ -20,7 +21,7 @@ class _GuruTahfidzHomePageState extends State<GuruTahfidzHomePage>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   String _userName = '';
-  String _userAvatarUrl = '';
+  String? _avatarUrl;
   int _beritaRefreshKey = 0;
 
   @override
@@ -48,8 +49,20 @@ class _GuruTahfidzHomePageState extends State<GuruTahfidzHomePage>
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _userName = prefs.getString('user_name') ?? 'Guru Tahfidz';
-      _userAvatarUrl = prefs.getString('avatar_url') ?? '';
     });
+
+    // Fetch avatar from DB
+    try {
+      final profile = await GuruProfileService.getBasicProfile();
+      if (mounted) {
+        setState(() {
+          _userName = profile.name.isNotEmpty ? profile.name : _userName;
+          _avatarUrl = profile.avatarUrl;
+        });
+      }
+    } catch (_) {
+      // Fallback to SharedPreferences data
+    }
   }
 
   Future<void> _refreshData() async {
@@ -134,16 +147,8 @@ class _GuruTahfidzHomePageState extends State<GuruTahfidzHomePage>
               shape: BoxShape.circle,
               border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.5), width: 2),
             ),
-            child: CircleAvatar(
-              radius: 20,
-              backgroundColor: AppTheme.white,
-              backgroundImage: _userAvatarUrl.isNotEmpty
-                  ? NetworkImage(_userAvatarUrl)
-                  : const AssetImage('lib/assets/default_avatar.png') as ImageProvider,
-              onBackgroundImageError: (_, __) {},
-              child: _userAvatarUrl.isEmpty
-                  ? const Icon(Icons.person_outline, color: AppTheme.textSecondary)
-                  : null,
+            child: ClipOval(
+              child: _buildTopBarAvatar(40),
             ),
           ),
           
@@ -325,6 +330,62 @@ class _GuruTahfidzHomePageState extends State<GuruTahfidzHomePage>
   }
 
 
+
+  Widget _buildTopBarAvatar(double size) {
+    final url = _avatarUrl ?? '';
+    if (url.isEmpty) return _buildInitialsWidget(size);
+
+    final imageUrl = url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
+    return Image.network(
+      imageUrl,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          width: size,
+          height: size,
+          color: AppTheme.primaryGreen.withOpacity(0.1),
+          child: const Center(
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTheme.primaryGreen,
+              ),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) => _buildInitialsWidget(size),
+    );
+  }
+
+  Widget _buildInitialsWidget(double size) {
+    final initials = _userName.isNotEmpty
+        ? _userName.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : 'G';
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppTheme.primaryGreen.withOpacity(0.15),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontSize: size * 0.35,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.primaryGreen,
+          ),
+        ),
+      ),
+    );
+  }
 
   void _showNotAvail(String menu) {
     ScaffoldMessenger.of(context).showSnackBar(

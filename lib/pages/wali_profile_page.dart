@@ -5,6 +5,8 @@ import '../services/wali_service.dart';
 import 'login_page.dart';
 import 'wali_account_center_page.dart';
 import 'wali_bantuan_page.dart';
+import 'wali_keamanan_page.dart';
+import 'wali_notification_page.dart';
 import 'wali_profil_anda_page.dart';
 
 class WaliProfilePage extends StatefulWidget {
@@ -156,7 +158,7 @@ class _WaliProfilePageState extends State<WaliProfilePage> {
         decoration: BoxDecoration(
           gradient: AppTheme.mainGradient,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.greenGlow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Stack(
           children: [
@@ -276,7 +278,7 @@ class _WaliProfilePageState extends State<WaliProfilePage> {
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,7 +358,7 @@ class _WaliProfilePageState extends State<WaliProfilePage> {
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           children: [
@@ -384,7 +386,14 @@ class _WaliProfilePageState extends State<WaliProfilePage> {
               title: 'Notifikasi',
               subtitle: 'Atur pemberitahuan',
               color: AppTheme.warmOrange,
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const WaliNotificationPage(),
+                  ),
+                );
+              },
             ),
             _buildDivider(),
             _buildSettingsTile(
@@ -407,7 +416,14 @@ class _WaliProfilePageState extends State<WaliProfilePage> {
               title: 'Keamanan',
               subtitle: 'Ubah kata sandi',
               color: AppTheme.softBlue,
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const WaliKeamananPage(),
+                  ),
+                );
+              },
             ),
             _buildDivider(),
             _buildSettingsTile(

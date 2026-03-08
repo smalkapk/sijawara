@@ -347,24 +347,7 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.softPurple.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  student.name.isNotEmpty ? student.name[0] : '?',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.softPurple,
-                  ),
-                ),
-              ),
-            ),
+            _buildStudentAvatar(student.avatarUrl, student.name, 44),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -384,6 +367,44 @@ class _GuruTugasStudentListPageState extends State<GuruTugasStudentListPage> {
             const Icon(Icons.chevron_right_rounded, color: AppTheme.grey400),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStudentAvatar(String? avatarUrl, String name, double size) {
+    final url = avatarUrl ?? '';
+    if (url.isNotEmpty) {
+      final imageUrl = url.startsWith('http') ? url : 'https://portal-smalka.com/$url';
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: size, height: size,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.softPurple.withOpacity(0.1)),
+              child: const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.softPurple))),
+            );
+          },
+          errorBuilder: (_, __, ___) => _buildInitials(name, size),
+        ),
+      );
+    }
+    return _buildInitials(name, size);
+  }
+
+  Widget _buildInitials(String name, double size) {
+    final initials = name.isNotEmpty
+        ? name.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : '?';
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.softPurple.withOpacity(0.1)),
+      child: Center(
+        child: Text(initials, style: TextStyle(fontSize: size * 0.4, fontWeight: FontWeight.w800, color: AppTheme.softPurple)),
       ),
     );
   }

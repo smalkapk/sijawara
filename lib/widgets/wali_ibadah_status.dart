@@ -41,13 +41,15 @@ class WaliIbadahStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final doneCount = prayers.where((p) => p.isDone).length;
+    final hasWakeUp = extras != null && extras!.wakeUpTime != null;
+    final hasDeeds = extras != null && extras!.deeds.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 5 waktu shalat dalam satu card (Klik untuk detail)
+          // 5 waktu shalat + ringkasan extras dalam satu card
           GestureDetector(
             onTap: () => _showPrayerReportSheet(context),
             child: Container(
@@ -55,12 +57,128 @@ class WaliIbadahStatus extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppTheme.white,
                 borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                boxShadow: AppTheme.softShadow,
                 border: Border.all(color: AppTheme.grey100, width: 1),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: _buildShalatCircles(),
+              child: Column(
+                children: [
+                  // Shalat circles
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: _buildShalatCircles(),
+                  ),
+
+                  // Jam Bangun & Kebaikan summary
+                  if (hasWakeUp || hasDeeds) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(
+                        height: 1,
+                        color: AppTheme.grey100,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        // Jam Bangun
+                        if (hasWakeUp)
+                          Expanded(
+                            child: _buildExtraSummaryItem(
+                              icon: Icons.alarm_rounded,
+                              iconColor: AppTheme.gold,
+                              label: 'Bangun',
+                              value: '${extras!.wakeUpTime} WIB',
+                              points: extras!.wakeUpPoints,
+                              pointsColor: AppTheme.gold,
+                            ),
+                          ),
+
+                        if (hasWakeUp && hasDeeds)
+                          Container(
+                            width: 1,
+                            height: 36,
+                            color: AppTheme.grey100,
+                          ),
+
+                        // Kebaikan
+                        if (hasDeeds)
+                          Expanded(
+                            child: _buildExtraSummaryItem(
+                              icon: Icons.volunteer_activism_rounded,
+                              iconColor: AppTheme.primaryGreen,
+                              label: 'Kebaikan',
+                              value: '${extras!.deeds.length} tercatat',
+                              points: extras!.deedsPoints,
+                              pointsColor: AppTheme.primaryGreen,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExtraSummaryItem({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required int points,
+    required Color pointsColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: iconColor.withOpacity(0.12),
+            ),
+            child: Icon(icon, color: iconColor, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.grey400,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: pointsColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '+$points',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: pointsColor,
               ),
             ),
           ),

@@ -11,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import '../theme.dart';
 import '../services/wali_service.dart';
+import '../widgets/skeleton_loader.dart';
 
 class WaliProfilAndaPage extends StatefulWidget {
   final WaliDashboardData? dashboardData;
@@ -746,7 +747,7 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: AppTheme.mainGradient,
-                    boxShadow: AppTheme.greenGlow,
+                    border: Border.all(color: AppTheme.grey100, width: 1),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(3),
@@ -799,17 +800,7 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppTheme.primaryGreen,
-                      border: Border.all(
-                        color: AppTheme.white,
-                        width: 2.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      border: Border.all(color: AppTheme.grey100, width: 1),
                     ),
                     child: _isUploadingAvatar
                         ? const Padding(
@@ -867,7 +858,7 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1005,7 +996,7 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1133,14 +1124,8 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
                                       decoration: BoxDecoration(
                                         color: AppTheme.primaryGreen,
                                         shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: AppTheme.primaryGreen
-                                                .withOpacity(0.4),
-                                            blurRadius: 12,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
+                                        border: Border.all(
+                                            color: AppTheme.grey100, width: 1),
                                       ),
                                       child: const Icon(
                                         Icons.home_rounded,
@@ -1240,19 +1225,13 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
       {required IconData icon, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+        child: Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Icon(icon, size: 20, color: AppTheme.textPrimary),
       ),
@@ -1262,14 +1241,14 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
   Widget _buildSaveButton() {
     return GestureDetector(
       onTap: _isSaving ? null : _saveProfile,
-      child: Container(
+        child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           gradient: _isSaving ? null : AppTheme.mainGradient,
           color: _isSaving ? AppTheme.grey200 : null,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: _isSaving ? [] : AppTheme.greenGlow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Center(
           child: _isSaving
@@ -1307,19 +1286,78 @@ class _WaliProfilAndaPageState extends State<WaliProfilAndaPage>
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircularProgressIndicator(color: AppTheme.primaryGreen),
-          SizedBox(height: 16),
-          Text(
-            'Memuat profil...',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 14,
+          const SizedBox(height: 8),
+          
+          // Avatar skeleton
+          Center(
+            child: SkeletonLoader(
+              height: 100,
+              width: 100,
+              borderRadius: BorderRadius.circular(50),
             ),
           ),
+          
+          const SizedBox(height: 24),
+          
+          // Form skeleton
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.white,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: AppTheme.grey100, width: 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    SkeletonLoader(height: 16, width: 16, borderRadius: BorderRadius.circular(4)),
+                    const SizedBox(width: 8),
+                    SkeletonLoader(height: 16, width: 120, borderRadius: BorderRadius.circular(4)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SkeletonLoader(height: 14, width: 100, borderRadius: BorderRadius.circular(4)),
+                const SizedBox(height: 8),
+                SkeletonLoader(height: 48, width: double.infinity, borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 16),
+                SkeletonLoader(height: 14, width: 100, borderRadius: BorderRadius.circular(4)),
+                const SizedBox(height: 8),
+                SkeletonLoader(height: 48, width: double.infinity, borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 16),
+                SkeletonLoader(height: 14, width: 100, borderRadius: BorderRadius.circular(4)),
+                const SizedBox(height: 8),
+                SkeletonLoader(height: 60, width: double.infinity, borderRadius: BorderRadius.circular(12)),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Map skeleton
+          SkeletonLoader(
+            height: 150,
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Save button skeleton
+          SkeletonLoader(
+            height: 52,
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          ),
+          
+          const SizedBox(height: 40),
         ],
       ),
     );

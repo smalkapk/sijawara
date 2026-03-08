@@ -163,7 +163,7 @@ class _WaliLivePageState extends State<WaliLivePage> {
               decoration: BoxDecoration(
                 color: AppTheme.white,
                 borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                boxShadow: AppTheme.softShadow,
+                border: Border.all(color: AppTheme.grey100, width: 1),
               ),
               child: Column(
                 children: List.generate(3, (index) {
@@ -298,19 +298,13 @@ class _WaliLivePageState extends State<WaliLivePage> {
               Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isOnline ? AppTheme.emerald : AppTheme.grey400,
-                  boxShadow: isOnline
-                      ? [
-                          BoxShadow(
-                            color: AppTheme.emerald.withOpacity(0.5),
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          ),
-                        ]
-                      : null,
-                ),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isOnline ? AppTheme.emerald : AppTheme.grey400,
+                    border: isOnline
+                        ? Border.all(color: AppTheme.grey100, width: 1)
+                        : null,
+                  ),
               ),
               const SizedBox(width: 8),
               Text(
@@ -361,7 +355,7 @@ class _WaliLivePageState extends State<WaliLivePage> {
         decoration: BoxDecoration(
           gradient: AppTheme.mainGradient,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.greenGlow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           children: [
@@ -658,7 +652,7 @@ class _WaliLivePageState extends State<WaliLivePage> {
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Center(
         child: Column(
@@ -698,7 +692,7 @@ class _WaliLivePageState extends State<WaliLivePage> {
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        boxShadow: AppTheme.softShadow,
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         children: List.generate(events.length, (index) {

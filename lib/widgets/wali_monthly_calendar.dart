@@ -226,7 +226,7 @@ class _WaliMonthlyCalendarState extends State<WaliMonthlyCalendar>
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           children: [
@@ -446,7 +446,7 @@ class _WaliMonthlyCalendarState extends State<WaliMonthlyCalendar>
   Widget _buildDayCell(int day, bool isToday, bool isFuture, int? prayerCount) {
     Color bgColor;
     Color textColor;
-    List<BoxShadow>? shadow;
+    
     Color dotColor = AppTheme.white;
     Color dotBgColor = AppTheme.white.withOpacity(0.3);
 
@@ -502,15 +502,7 @@ class _WaliMonthlyCalendarState extends State<WaliMonthlyCalendar>
       }
     }
 
-    if (isToday) {
-      shadow = [
-        BoxShadow(
-          color: AppTheme.primaryGreen.withOpacity(0.3),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ];
-    }
+    // No shadows: visual emphasis handled via `border` for today.
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
@@ -519,7 +511,6 @@ class _WaliMonthlyCalendarState extends State<WaliMonthlyCalendar>
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: shadow,
         border: isToday ? Border.all(color: AppTheme.gold, width: 2) : null,
       ),
       child: Column(
@@ -729,88 +720,19 @@ class _WaliMonthlyCalendarState extends State<WaliMonthlyCalendar>
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     children: [
-                      // ── Read-only notice ──
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 24),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.bgColor,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppTheme.primaryGreen.withOpacity(0.2),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline_rounded,
-                              size: 18,
-                              color: AppTheme.primaryGreen,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Hanya wali yang dapat melihat data histori ini',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ── Belum ada data ──
-                      if (!detail.hasData && !date.isBefore(DateTime(
-                        DateTime.now().year,
-                        DateTime.now().month,
-                        DateTime.now().day,
-                      )))
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppTheme.grey100.withOpacity(0.5),
-                            borderRadius:
-                                BorderRadius.circular(AppTheme.radiusMd),
-                          ),
-                          child: const Column(
-                            children: [
-                              Icon(Icons.info_outline_rounded,
-                                  color: AppTheme.grey400, size: 32),
-                              SizedBox(height: 8),
-                              Text(
-                                'Belum ada data ibadah di hari ini',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
                       // ── Shalat List ──
-                      if (detail.hasData || date.isBefore(DateTime(
-                        DateTime.now().year,
-                        DateTime.now().month,
-                        DateTime.now().day,
-                      )))
-                        ...detail.prayers
-                            .map((item) => _buildReportItem(item)),
+                      ...detail.prayers
+                          .map((item) => _buildReportItem(item)),
+
+                      const SizedBox(height: 20),
 
                       // ── Seksi: Berbuat Baik ──
                       if (detail.extras != null &&
                           detail.extras!.deeds.isNotEmpty) ...[
-                        const SizedBox(height: 20),
                         _buildSectionHeader(
                           icon: Icons.volunteer_activism_rounded,
                           iconColor: AppTheme.primaryGreen,
-                          title: 'Perbuatan Baik',
+                          title: 'Perbuatan Baik Hari Ini',
                           subtitle:
                               '${detail.extras!.deeds.length} kebaikan tercatat',
                         ),
@@ -822,12 +744,12 @@ class _WaliMonthlyCalendarState extends State<WaliMonthlyCalendar>
                             color: AppTheme.primaryGreen,
                           ),
                         ),
+                        const SizedBox(height: 20),
                       ],
 
                       // ── Seksi: Bangun Pagi ──
                       if (detail.extras != null &&
                           detail.extras!.wakeUpTime != null) ...[
-                        const SizedBox(height: 20),
                         _buildSectionHeader(
                           icon: Icons.alarm_rounded,
                           iconColor: AppTheme.gold,
@@ -904,7 +826,34 @@ class _WaliMonthlyCalendarState extends State<WaliMonthlyCalendar>
                             ],
                           ),
                         ),
+                        const SizedBox(height: 28),
                       ],
+
+                      // ── Info: Belum ada data ──
+                      if (detail.extras == null &&
+                          detail.prayers.every((p) => p.isUpcoming))
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: AppTheme.grey100.withOpacity(0.5),
+                            borderRadius:
+                                BorderRadius.circular(AppTheme.radiusMd),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.info_outline_rounded,
+                                  color: AppTheme.grey400, size: 32),
+                              SizedBox(height: 8),
+                              Text(
+                                'Belum ada data ibadah hari ini',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
                       const SizedBox(height: 60),
                     ],

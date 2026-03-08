@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
+import '../services/fcm_service.dart';
+import '../widgets/app_logo.dart';
 import 'home_page.dart';
 import 'wali_home_page.dart';
 import 'guru_home_page.dart';
@@ -98,6 +100,11 @@ class _LoginPageState extends State<LoginPage>
         // guru_kelas
         destination = const GuruHomePage();
       }
+
+      // Register FCM token setelah login berhasil
+      FcmService.instance.init().then((_) {
+        FcmService.instance.registerAfterLogin();
+      });
 
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => destination),
@@ -300,6 +307,14 @@ class _LoginPageState extends State<LoginPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const AppLogo(
+          width: 176,
+          height: 84,
+          backgroundColor: Color(0xF2FFFFFF),
+          borderRadius: BorderRadius.all(Radius.circular(24)),
+          padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        ),
+        const SizedBox(height: 24),
         const Text(
           'Assalamualaikum\nSelamat Datang',
           textAlign: TextAlign.left,

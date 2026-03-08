@@ -93,6 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                  FROM prayer_logs
                  WHERE student_id = :sid
                    AND prayer_date LIKE :m
+                   AND prayer_name IN ('Subuh','Dzuhur','Ashar','Maghrib','Isya')
                    AND status IN ('done','done_jamaah')
                  GROUP BY prayer_date"
             );

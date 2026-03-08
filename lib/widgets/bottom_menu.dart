@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
+import '../services/connectivity_service.dart';
+import 'connectivity_wrapper.dart';
 
 /// Helper class untuk menangani scroll hide/show pada BottomMenu.
 /// Bisa digunakan di halaman mana saja.
@@ -77,6 +79,10 @@ class BottomMenu extends StatefulWidget {
   final ValueChanged<int>? onItemTap;
   final bool isVisible;
 
+  /// Notifier global agar widget lain (misal ConnectivityWrapper) tahu
+  /// apakah bottom menu sedang visible.
+  static final ValueNotifier<bool> visibilityNotifier = ValueNotifier<bool>(true);
+
   const BottomMenu({
     super.key,
     this.selectedIndex = 1,
@@ -90,10 +96,40 @@ class BottomMenu extends StatefulWidget {
 
 class _BottomMenuState extends State<BottomMenu> {
   @override
+  void initState() {
+    super.initState();
+    ConnectivityService.instance.isConnected.addListener(_onConnectivityChanged);
+  }
+
+  @override
+  void dispose() {
+    ConnectivityService.instance.isConnected.removeListener(_onConnectivityChanged);
+    super.dispose();
+  }
+
+  void _onConnectivityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final isOffline = !ConnectivityService.instance.isConnected.value;
+    final navBarHeight = 62.0 + bottomPadding;
 
-    return AnimatedSlide(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isOffline)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            curve: widget.isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
+            transform: widget.isVisible
+                ? Matrix4.identity()
+                : Matrix4.translationValues(0, navBarHeight - 40, 0),
+            child: const OfflineBanner(),
+          ),
+        AnimatedSlide(
       offset: widget.isVisible ? Offset.zero : const Offset(0, 1.5),
       duration: const Duration(milliseconds: 350),
       curve: widget.isVisible ? Curves.easeOutCubic : Curves.easeInCubic,
@@ -154,6 +190,8 @@ class _BottomMenuState extends State<BottomMenu> {
           ),
         ),
       ),
+      ),
+      ],
     );
   }
 }

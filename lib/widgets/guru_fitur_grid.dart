@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../pages/guru_alka_ai_page.dart';
-import '../pages/guru_sp_student_list_page.dart';
 import '../pages/guru_evaluasi_list_page.dart';
 import '../pages/guru_ibadah_student_list_page.dart';
 
@@ -130,20 +129,7 @@ class GuruFiturGrid extends StatelessWidget {
                       );
                     },
                   ),
-                  buildGridItem(
-                    'SP Siswa',
-                    Icons.warning_amber_rounded,
-                    AppTheme.gold,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const GuruSpStudentListPage(),
-                        ),
-                      );
-                    },
-                  ),
+
                 ],
               );
             },

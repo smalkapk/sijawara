@@ -419,6 +419,75 @@ class ChatService {
       throw Exception(body['message'] ?? 'Gagal menghapus pesan');
     }
   }
+  /// Pin pesan (hanya guru kelas)
+  static Future<Map<String, dynamic>> pinMessage({
+    required int messageId,
+    required int partnerId,
+  }) async {
+    final token = await AuthService.getToken();
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/chat.php?action=pin'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'message_id': messageId,
+            'partner_id': partnerId,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['success'] == true) {
+      return body['data'] as Map<String, dynamic>;
+    }
+    throw Exception(body['message'] ?? 'Gagal pin pesan');
+  }
+
+  /// Unpin pesan (hanya guru kelas)
+  static Future<void> unpinMessage({required int partnerId}) async {
+    final token = await AuthService.getToken();
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/chat.php?action=unpin'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'partner_id': partnerId}),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['success'] != true) {
+      throw Exception(body['message'] ?? 'Gagal unpin pesan');
+    }
+  }
+
+  /// Ambil pesan yang di-pin untuk percakapan ini
+  static Future<Map<String, dynamic>?> getPinnedMessage({
+    required int partnerId,
+  }) async {
+    final token = await AuthService.getToken();
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/chat.php?action=get_pinned&partner_id=$partnerId'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (body['success'] == true) {
+      return body['data'] as Map<String, dynamic>?;
+    }
+    throw Exception(body['message'] ?? 'Gagal mendapatkan pinned message');
+  }
+
   static Future<int> getCurrentUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('user_id') ?? 0;
@@ -591,6 +660,38 @@ class ChatWebSocket {
         'type': 'delete_message',
         'message_id': messageId,
         'receiver_id': receiverId,
+      }),
+    );
+  }
+
+  /// Broadcast pin pesan ke partner via WS
+  void pinMessageWs({
+    required int partnerId,
+    required int messageId,
+    required String pinPreview,
+    int? pinSenderId,
+    String? pinnedByName,
+  }) {
+    if (!_isConnected || _socket == null) return;
+    _socket!.add(
+      jsonEncode({
+        'type': 'pin_message',
+        'partner_id': partnerId,
+        'message_id': messageId,
+        'pin_preview': pinPreview,
+        if (pinSenderId != null) 'pin_sender_id': pinSenderId,
+        if (pinnedByName != null) 'pinned_by_name': pinnedByName,
+      }),
+    );
+  }
+
+  /// Broadcast unpin pesan ke partner via WS
+  void unpinMessageWs({required int partnerId}) {
+    if (!_isConnected || _socket == null) return;
+    _socket!.add(
+      jsonEncode({
+        'type': 'unpin_message',
+        'partner_id': partnerId,
       }),
     );
   }

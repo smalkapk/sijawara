@@ -22,6 +22,11 @@ class PageCache {
   static List<TahfidzSetoran>? setoranList;
   static DateTime? setoranTimestamp;
 
+  // ── GURU HOME PAGE ──
+  static String? guruAvatarUrl;
+  static String? guruName;
+  static DateTime? guruTimestamp;
+
   /// Cek apakah cache masih dianggap segar.
   /// Default: cache valid selama [maxAgeMinutes] menit (default 30 menit).
   static bool isFresh(DateTime? timestamp, {int maxAgeMinutes = 30}) {
@@ -39,6 +44,9 @@ class PageCache {
     leaderboardTimestamp = null;
     setoranList = null;
     setoranTimestamp = null;
+    guruAvatarUrl = null;
+    guruName = null;
+    guruTimestamp = null;
   }
 
   /// Bersihkan cache halaman Beranda saja.
@@ -59,5 +67,12 @@ class PageCache {
   static void clearQuran() {
     setoranList = null;
     setoranTimestamp = null;
+  }
+
+  /// Bersihkan cache halaman Guru.
+  static void clearGuru() {
+    guruAvatarUrl = null;
+    guruName = null;
+    guruTimestamp = null;
   }
 }

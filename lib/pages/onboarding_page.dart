@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
+import '../widgets/app_logo.dart';
 import 'login_page.dart';
 
 /// Onboarding Page - Shows only once after first install
@@ -399,6 +400,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const AppLogo(
+                width: 176,
+                height: 84,
+                backgroundColor: Color(0xF2FFFFFF),
+                borderRadius: BorderRadius.all(Radius.circular(24)),
+                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              ),
+              const SizedBox(height: 28),
               const Text(
                 'Digitalisasi Dimulai\nDari Sekarang',
                 textAlign: TextAlign.left,

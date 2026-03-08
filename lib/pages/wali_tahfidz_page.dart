@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
+import '../widgets/skeleton_loader.dart';
 import '../services/tahfidz_service.dart';
 
 class WaliTahfidzPage extends StatefulWidget {
@@ -70,7 +71,7 @@ class _WaliTahfidzPageState extends State<WaliTahfidzPage>
               _buildHeader(),
               Expanded(
                 child: _isLoading
-                    ? _buildLoadingState()
+                    ? const PublicSpeakingSkeleton()
                     : _buildContent(),
               ),
             ],
@@ -147,34 +148,6 @@ class _WaliTahfidzPageState extends State<WaliTahfidzPage>
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Loading ──
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              color: AppTheme.primaryGreen,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Memuat data tahfidz...',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.grey400,
-              fontWeight: FontWeight.w500,
-            ),
           ),
         ],
       ),
@@ -298,13 +271,7 @@ class _WaliTahfidzPageState extends State<WaliTahfidzPage>
       decoration: BoxDecoration(
         color: AppTheme.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppTheme.grey100, width: 1),
       ),
       child: Column(
         children: [
@@ -392,18 +359,7 @@ class _WaliTahfidzPageState extends State<WaliTahfidzPage>
   // ── Setoran Card ──
   Widget _buildSetoranCard(
       TahfidzSetoran setoran, int animIndex, int setoranNo) {
-    final dateFormat = DateFormat('EEEE, d MMMM yyyy', 'id_ID');
-    final formattedDate = dateFormat.format(setoran.setoranAt);
-
-    // Nilai badge color
-    Color nilaiColor = _gradeColor(setoran.grade);
-
-    // Setoran range text
-    final setoranRange = setoran.isMultiSurah
-        ? setoran.items.map((i) => 'QS. ${i.surahName}: ${i.ayatFrom}—${i.ayatTo}').join('\n')
-        : 'QS. ${setoran.surahName}: ${setoran.ayatFrom} — ${setoran.ayatTo}';
-
-    final sudahParaf = setoran.guruName.isNotEmpty;
+    final dateStr = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(setoran.setoranAt);
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -419,432 +375,82 @@ class _WaliTahfidzPageState extends State<WaliTahfidzPage>
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: AppTheme.white,
           borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-          boxShadow: AppTheme.softShadow,
+          border: Border.all(color: AppTheme.grey100, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Date header strip ──
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: AppTheme.mainGradient,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Nomor urut
-                  Container(
-                    width: 24,
-                    height: 24,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Text(
-                      '$setoranNo',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Icon(
-                    Icons.calendar_today_rounded,
-                    color: Colors.white70,
-                    size: 13,
-                  ),
-                  const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      formattedDate,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Setoran $setoranNo',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          dateStr,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.grey400,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  // Nilai badge(s)
-                  if (setoran.isMultiSurah)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: setoran.items.map((item) {
-                        final gc = _gradeColor(item.grade);
-                        return Container(
-                          margin: const EdgeInsets.only(left: 4),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            item.grade,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: gc,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        setoran.grade,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: nilaiColor,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
-
-            // ── Content ──
+            Container(height: 1, color: AppTheme.grey100),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Setoran range
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.auto_stories_rounded,
-                          size: 16,
-                          color: AppTheme.primaryGreen,
-                        ),
+                  if (setoran.isMultiSurah && setoran.items.isNotEmpty)
+                    for (int i = 0; i < setoran.items.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 6),
+                      _buildSetoranItemRow(
+                        surahName: setoran.items[i].surahName,
+                        ayatText: 'Ayat ${setoran.items[i].ayatFrom} - ${setoran.items[i].ayatTo}',
+                        grade: setoran.items[i].grade,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Setoran',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              setoranRange,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-                  Container(height: 1, color: AppTheme.grey100),
-                  const SizedBox(height: 12),
-
-                  // Nilai & Paraf section
-                  if (setoran.isMultiSurah) ...[
-                    // ── Nilai per-surah (full width) ──
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: nilaiColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.grade_rounded,
-                            size: 16,
-                            color: nilaiColor,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Nilai',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.grey400,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              ...setoran.items.map((item) {
-                                final gc = _gradeColor(item.grade);
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 3),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: gc.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          item.grade,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            color: gc,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Flexible(
-                                        child: Text(
-                                          item.surahName,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppTheme.textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ],
+                    ]
+                  else
+                    _buildSetoranItemRow(
+                      surahName: setoran.surahName,
+                      ayatText: 'Ayat ${setoran.ayatFrom} - ${setoran.ayatTo}',
+                      grade: setoran.grade,
                     ),
-                    const SizedBox(height: 12),
-                    Container(height: 1, color: AppTheme.grey100),
-                    const SizedBox(height: 12),
-                    // ── Paraf guru (full width) ──
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: sudahParaf
-                                ? AppTheme.primaryGreen.withValues(alpha: 0.08)
-                                : AppTheme.gold.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            sudahParaf
-                                ? Icons.verified_rounded
-                                : Icons.pending_rounded,
-                            size: 16,
-                            color: sudahParaf
-                                ? AppTheme.primaryGreen
-                                : AppTheme.gold,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Paraf Guru',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            Text(
-                              sudahParaf
-                                  ? (setoran.guruName.isNotEmpty
-                                      ? setoran.guruName
-                                      : 'Sudah')
-                                  : 'Menunggu',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: sudahParaf
-                                    ? AppTheme.primaryGreen
-                                    : AppTheme.gold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ] else
-                    // ── Single surah: Nilai & Paraf in one row ──
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: nilaiColor.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.grade_rounded,
-                            size: 16,
-                            color: nilaiColor,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Nilai',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            Text(
-                              setoran.grade,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: nilaiColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: sudahParaf
-                                ? AppTheme.primaryGreen.withValues(alpha: 0.08)
-                                : AppTheme.gold.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            sudahParaf
-                                ? Icons.verified_rounded
-                                : Icons.pending_rounded,
-                            size: 16,
-                            color: sudahParaf
-                                ? AppTheme.primaryGreen
-                                : AppTheme.gold,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Paraf Guru',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.grey400,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            Text(
-                              sudahParaf
-                                  ? (setoran.guruName.isNotEmpty
-                                      ? setoran.guruName
-                                      : 'Sudah')
-                                  : 'Menunggu',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: sudahParaf
-                                    ? AppTheme.primaryGreen
-                                    : AppTheme.gold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                  // Notes section
                   if (setoran.notes.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Container(height: 1, color: AppTheme.grey100),
-                    const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.teal.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.note_rounded,
-                            size: 16,
-                            color: AppTheme.teal,
-                          ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Catatan Guru: ${setoran.notes}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textSecondary,
+                          height: 1.4,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Catatan',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.grey400,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                setoran.notes,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimary,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ],
@@ -852,6 +458,78 @@ class _WaliTahfidzPageState extends State<WaliTahfidzPage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSetoranItemRow({
+    required String surahName,
+    required String ayatText,
+    required String grade,
+  }) {
+    final gColor = _gradeColor(grade);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.menu_book_rounded,
+              color: AppTheme.primaryGreen,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  surahName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  ayatText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.grey400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: gColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              grade,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: gColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

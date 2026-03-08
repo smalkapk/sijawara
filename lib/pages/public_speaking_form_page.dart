@@ -33,8 +33,10 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Hide system navigation bar
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Hide system navigation bar hanya saat tambah catatan baru
+    if (!_isEditing) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
 
     _fadeController = AnimationController(
       vsync: this,
@@ -66,8 +68,10 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Restore system UI
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // Restore system UI hanya jika sebelumnya disembunyikan (mode baru)
+    if (!_isEditing) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     _fadeController.dispose();
     _judulController.dispose();
     _materiController.dispose();
@@ -270,9 +274,8 @@ class _PublicSpeakingFormPageState extends State<PublicSpeakingFormPage>
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: _isEditing,
       onPopInvokedWithResult: (didPop, result) {
-        // Block back gesture/button - user must submit or app goes background
         if (didPop) return;
       },
       child: Scaffold(

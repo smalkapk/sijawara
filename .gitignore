@@ -71,3 +71,7 @@ analyze_out.txt
 analyze_output.txt
 NUL
 *.png.bak
+
+
+# api key firebase
+server/api/config/firebase-service-account.json
